@@ -7,12 +7,19 @@ const HistoryContext = createContext();
 
 export const useHistory = () => useContext(HistoryContext);
 
+const TERMINAL_STATUSES = [
+  'RECHARGE_SUCCESS',
+  'RECHARGE_FAILED',
+  'REFUNDED',
+  'SUCCESS',
+  'FAILED'
+];
+
 export const HistoryProvider = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [rechargeHistory, setRechargeHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch history from backend when authenticated
   const fetchHistory = useCallback(async () => {
     if (!isAuthenticated) {
       setRechargeHistory([]);
@@ -36,28 +43,43 @@ export const HistoryProvider = ({ children }) => {
   const socket = useSocket();
 
   useEffect(() => {
-    if (socket) {
-      const handleStatusUpdate = (update) => {
-        setRechargeHistory(prev => prev.map(record => 
-          (record._id === update.rechargeId || record.id === update.rechargeId)
-            ? { ...record, status: update.status, failureReason: update.reason || record.failureReason }
-            : record
-        ));
-      };
+    if (!socket) return;
 
-      socket.on('recharge_status', handleStatusUpdate);
-      return () => socket.off('recharge_status', handleStatusUpdate);
-    }
-  }, [socket]);
+    const handleStatusUpdate = (update) => {
+      setRechargeHistory((prev) =>
+        prev.map((record) => {
+          const id = record._id || record.id;
+          if (id !== update.rechargeId && id?.toString() !== update.rechargeId?.toString()) {
+            return record;
+          }
+          return {
+            ...record,
+            status: update.status,
+            failureReason: update.reason || update.failureReason || record.failureReason,
+            providerResponse: update.providerResponse || record.providerResponse,
+            cashbackEarned: update.cashback ?? record.cashbackEarned,
+            rechargeId: update.rechargeIdRef || record.rechargeId
+          };
+        })
+      );
 
-  // Add a recharge record via API (called after successful recharge)
+      if (TERMINAL_STATUSES.includes(update.status)) {
+        fetchHistory();
+      }
+    };
+
+    socket.on('recharge_status', handleStatusUpdate);
+    return () => socket.off('recharge_status', handleStatusUpdate);
+  }, [socket, fetchHistory]);
+
   const addRechargeRecord = useCallback((record) => {
-    // Optimistically update local state (the recharge was already created server-side)
-    setRechargeHistory(prev => [record, ...prev]);
+    setRechargeHistory((prev) => [record, ...prev]);
   }, []);
 
   return (
-    <HistoryContext.Provider value={{ rechargeHistory, addRechargeRecord, loading, refetchHistory: fetchHistory }}>
+    <HistoryContext.Provider
+      value={{ rechargeHistory, addRechargeRecord, loading, refetchHistory: fetchHistory }}
+    >
       {children}
     </HistoryContext.Provider>
   );

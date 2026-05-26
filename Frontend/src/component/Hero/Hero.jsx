@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FaMobileAlt, FaCreditCard, FaWifi, FaPhoneAlt,
@@ -160,7 +160,23 @@ export default function Hero() {
   const { walletBalance, deductWallet, addCashback } = useWallet();
   const { addRechargeRecord } = useHistory();
 
+  const [dbOffers, setDbOffers] = useState([]);
+
+  useEffect(() => {
+    const fetchOffers = async () => {
+      try {
+        const res = await api.get('/recharges/offers');
+        setDbOffers(res.data || []);
+      } catch (err) {
+        console.error('Failed to fetch offers:', err);
+      }
+    };
+    fetchOffers();
+  }, []);
+
   const [activeTab, setActiveTab] = useState({ id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge." });
+
+  const activeOffers = dbOffers.filter(o => o.category === activeTab.name.toLowerCase());
 
   // Quick Recharge Form States
   const [number, setNumber] = useState("");
@@ -645,10 +661,10 @@ export default function Hero() {
                 <p className="text-slate-700 text-[15px] font-bold leading-relaxed font-display">
                   {activeTab.description}
                 </p>
-                {currentCat.offers && currentCat.offers.length > 0 && (
+                {activeOffers && activeOffers.length > 0 && (
                   <div className="space-y-3 mt-2 border-t border-slate-100 pt-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Coupons</p>
-                    {currentCat.offers.map((offer, oIdx) => (
+                    {activeOffers.map((offer, oIdx) => (
                       <div key={oIdx} className="bg-slate-50 border border-slate-150 rounded-2xl p-3 flex flex-col gap-2 transition-all hover:bg-slate-100/50">
                         <p className="text-slate-700 text-[11px] font-bold font-display leading-snug">{offer.description}</p>
                         <div className="text-sky-650 font-black uppercase tracking-wider text-[9px] flex items-center gap-1.5 bg-sky-50 border border-sky-100 w-fit px-2 py-1 rounded-lg">

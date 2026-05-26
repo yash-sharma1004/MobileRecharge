@@ -1,5 +1,20 @@
 import mongoose from 'mongoose';
 
+const RECHARGE_STATUSES = [
+  'PAYMENT_PENDING',
+  'PAYMENT_SUCCESS',
+  'RECHARGE_PROCESSING',
+  'RECHARGE_SUCCESS',
+  'RECHARGE_FAILED',
+  'REFUND_PROCESSING',
+  'REFUNDED',
+  // Legacy (existing records)
+  'PENDING',
+  'PROCESSING',
+  'SUCCESS',
+  'FAILED'
+];
+
 const rechargeSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -23,6 +38,9 @@ const rechargeSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Plan details are required']
   },
+  planId: {
+    type: String
+  },
   planData: {
     price: Number,
     data: String,
@@ -35,10 +53,15 @@ const rechargeSchema = new mongoose.Schema({
     type: String,
     default: 'UPI'
   },
+  category: {
+    type: String,
+    enum: ['mobile', 'broadband', 'utility'],
+    default: 'mobile'
+  },
   status: {
     type: String,
-    enum: ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REFUNDED'],
-    default: 'PENDING'
+    enum: RECHARGE_STATUSES,
+    default: 'PAYMENT_PENDING'
   },
   rechargeId: {
     type: String,
@@ -49,6 +72,21 @@ const rechargeSchema = new mongoose.Schema({
     type: String,
     unique: true,
     sparse: true
+  },
+  paymentId: {
+    type: String,
+    sparse: true
+  },
+  paymentOrderId: {
+    type: String,
+    sparse: true
+  },
+  parentRechargeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Recharge'
+  },
+  couponCode: {
+    type: String
   },
   failureReason: {
     type: String
@@ -64,7 +102,14 @@ const rechargeSchema = new mongoose.Schema({
   },
   expiryDate: {
     type: Date
+  },
+  providerResponse: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null
   }
 }, { timestamps: true });
+
+rechargeSchema.index({ status: 1, createdAt: -1 });
+rechargeSchema.index({ userId: 1, status: 1 });
 
 export const Recharge = mongoose.model('Recharge', rechargeSchema);

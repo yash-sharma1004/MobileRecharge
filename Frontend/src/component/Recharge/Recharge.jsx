@@ -2,10 +2,12 @@
 // 4-step flow: Operator → Number → Plan → Payment
 // Stack: React + Tailwind CSS
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useWallet } from "../../context/WalletContext";
 import { useHistory } from "../../context/HistoryContext";
+import { useSocket } from "../../context/SocketContext";
 import api from "../../utils/api";
+import { loadRazorpay } from "../../utils/loadRazorpay";
 
 // ── Data ──
 const operators = [
@@ -46,13 +48,7 @@ const detectOperator = (mobile) => {
   return null;
 };
 
-const coupons = [
-  { code: "SAVE50", discount: 50, minAmount: 200, expiry: "2026-12-31" },
-  { code: "NEWUSER100", discount: 100, minAmount: 300, expiry: "2026-12-31" },
-  { code: "BHAVYA2202", type: "percentage", discount: 100, minAmount: 0, expiry: "2026-12-31" },
-  { code: "WEEKEND20",  discount: 5, minAmount: 150, expiry: "2026-12-31" },
-  { code: "FLAT75", discount: 15.5, minAmount: 500, expiry: "2026-12-31" }
-];
+// Coupons are now loaded dynamically from the backend database
 
 const cashbackRules = {
   type: "random", // "fixed", "percentage", or "random"
@@ -171,6 +167,7 @@ export default function Recharge() {
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
+  const [coupons, setCoupons] = useState([]);
 
   // Referral state
   const [referralCodeInput, setReferralCodeInput] = useState("");
@@ -179,7 +176,12 @@ export default function Recharge() {
 
   // Cashback state
   const [cashbackAmount, setCashbackAmount] = useState(0);
-  const { walletBalance: globalWalletBalance, addCashback, deductWallet } = useWallet();
+  const { 
+    walletBalance: globalWalletBalance, 
+    createTopUpOrder,
+    verifyTopUpPayment,
+    refetchWallet
+  } = useWallet();
   const { addRechargeRecord, rechargeHistory } = useHistory();
   const [cashbackMessage, setCashbackMessage] = useState("");
   const [useWalletBalance, setUseWalletBalance] = useState(false);
@@ -191,7 +193,7 @@ export default function Recharge() {
   // Quick Recharge state
   const [lastRechargeData, setLastRechargeData] = useState(null);
 
-  // Fetch expiry and last recharge from backend API
+  // Fetch expiry, last recharge, and coupons from backend API
   useEffect(() => {
     const fetchRechargeData = async () => {
       try {
@@ -215,11 +217,26 @@ export default function Recharge() {
         // Silently fail — user may not have any recharges yet
       }
     };
+
+    const fetchCoupons = async () => {
+      try {
+        const res = await api.get('/recharges/coupons');
+        setCoupons(res.data || []);
+      } catch (err) {
+        console.error('Failed to fetch coupons:', err);
+      }
+    };
+
     fetchRechargeData();
+    fetchCoupons();
   }, []);
 
   const [processing, setProcessing] = useState(false);
   const [done, setDone] = useState(false);
+  const [liveStatus, setLiveStatus] = useState("RECHARGE_PROCESSING");
+  const [liveMessage, setLiveMessage] = useState("Submitting recharge to operator…");
+  const pendingRechargeId = useRef(null);
+  const socket = useSocket();
 
   const handleRechargeNowClick = () => {
     if (rechargeHistory && rechargeHistory.length > 0) {
@@ -358,7 +375,107 @@ export default function Recharge() {
     setProcessing(true);
 
     try {
-      // POST recharge to backend — cashback, wallet, referral all handled server-side
+      let finalWalletUsedAmount = walletUsedAmount;
+      let finalUseWallet = useWalletBalance;
+
+      // If there is a remaining balance to be paid via Razorpay
+      if (finalAmount > 0) {
+        // Load Razorpay dynamically
+        const sdkLoaded = await loadRazorpay();
+        if (!sdkLoaded) {
+          setProcessing(false);
+          alert("Failed to load Razorpay SDK. Please check your internet connection.");
+          return;
+        }
+
+        // 1. Create top-up order on backend for the remaining difference
+        const orderRes = await createTopUpOrder(finalAmount);
+        if (!orderRes.success || !orderRes.data) {
+          throw new Error(orderRes.message || "Failed to create payment order.");
+        }
+
+        const order = orderRes.data;
+
+        // Check if we are using placeholder/mock credentials
+        const isMockMode = 
+          !import.meta.env.VITE_RAZORPAY_KEY || 
+          import.meta.env.VITE_RAZORPAY_KEY.includes('YOUR_KEY_ID');
+
+        let paymentPromise;
+        if (isMockMode && order.orderId.startsWith('order_mock_')) {
+          console.log("ℹ️ Placeholder keys detected. Running in mock Razorpay simulator mode.");
+          
+          paymentPromise = (async () => {
+            // Simulate bank payment delay
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            
+            // Verify payment on backend
+            return await verifyTopUpPayment({
+              razorpay_order_id: order.orderId,
+              razorpay_payment_id: `pay_mock_${Date.now()}`,
+              razorpay_signature: "mock_signature_approved"
+            });
+          })();
+        } else {
+          // 2. Open Razorpay Checkout for the difference
+          paymentPromise = new Promise((resolve, reject) => {
+            const options = {
+              key: import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_dummyKeyId",
+              amount: order.amount * 100,
+            currency: order.currency || "INR",
+            name: "MobileRecharge",
+            description: `Recharge Payment for +91 ${number}`,
+            order_id: order.orderId,
+            handler: async function (response) {
+              try {
+                // Verify signature on backend
+                const verifyRes = await verifyTopUpPayment({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature
+                });
+
+                if (verifyRes.success) {
+                  resolve(verifyRes);
+                } else {
+                  reject(new Error(verifyRes.message || "Payment signature verification failed."));
+                }
+              } catch (err) {
+                reject(err);
+              }
+            },
+            prefill: {
+              name: "Premium Customer",
+              email: "customer@example.com",
+              contact: number
+            },
+            theme: {
+              color: "#4f46e5"
+            },
+            modal: {
+              ondismiss: function () {
+                reject(new Error("Payment cancelled by user."));
+              }
+            }
+          };
+
+          const rzp = new window.Razorpay(options);
+          rzp.on("payment.failed", function (response) {
+            reject(new Error(response.error.description || "Payment failed."));
+          });
+          rzp.open();
+        });
+      }
+
+        // Wait for payment to complete and verify
+        await paymentPromise;
+
+        // Now that the top-up succeeded, the entire baseFinalAmount will be debited from the wallet
+        finalWalletUsedAmount = baseFinalAmount;
+        finalUseWallet = true;
+      }
+
+      // 3. Create recharge in the backend using the updated wallet balance
       const result = await api.post('/recharges', {
         operator: op?.name,
         number: number,
@@ -375,42 +492,32 @@ export default function Recharge() {
         payMethod: payMethods.find(p => p.id === payMethod)?.label || 'UPI',
         couponCode: appliedCoupon?.code || undefined,
         referralCode: appliedReferralCode || undefined,
-        useWallet: useWalletBalance,
-        walletAmountUsed: walletUsedAmount
+        useWallet: finalUseWallet,
+        walletAmountUsed: finalWalletUsedAmount
       });
 
-      const { recharge, cashbackEarned, walletUsed } = result.data;
+      const { recharge, walletUsed } = result.data;
 
-      // Update UI with server response
-      if (cashbackEarned > 0) {
-        setCashbackAmount(cashbackEarned);
-        setCashbackMessage(`₹${cashbackEarned} cashback will be credited to your wallet`);
-        addCashback(cashbackEarned);
-      }
+      pendingRechargeId.current = recharge.id;
+      setLiveStatus(recharge.status || "RECHARGE_PROCESSING");
+      setLiveMessage(result.message || "Recharge processing with operator…");
+
       if (walletUsed > 0) {
-        deductWallet(walletUsed);
+        await refetchWallet();
       }
 
-      // Add to local history (optimistic update)
       addRechargeRecord({
         _id: recharge.id,
-        id: recharge.txnId,
+        id: recharge.transactionId,
         operator: recharge.operator,
         number: recharge.number,
         amount: recharge.amount,
         plan: recharge.plan,
         createdAt: recharge.date,
         status: recharge.status,
-        payMethod: recharge.payMethod
+        providerResponse: recharge.providerResponse
       });
 
-      // Update expiry from server
-      if (recharge.expiryDate) {
-        setExpiryDate(recharge.expiryDate);
-        setDaysLeft(plan?.validityDays);
-      }
-
-      // Update quick recharge data
       setLastRechargeData({
         mobile: number,
         operator: operator,
@@ -422,9 +529,44 @@ export default function Recharge() {
     } catch (err) {
       console.error('Recharge failed:', err);
       setProcessing(false);
-      alert(err.message || 'Recharge failed. Please try again.');
+      alert(err.data?.message || err.message || 'Recharge failed. Please try again.');
     }
   };
+
+  useEffect(() => {
+    if (!socket || !done) return;
+
+    const onStatus = (update) => {
+      if (
+        pendingRechargeId.current &&
+        update.rechargeId?.toString() !== pendingRechargeId.current?.toString()
+      ) {
+        return;
+      }
+      setLiveStatus(update.status);
+      if (update.message) setLiveMessage(update.message);
+      if (update.reason || update.failureReason) {
+        setLiveMessage(update.reason || update.failureReason);
+      }
+      if (update.status === "RECHARGE_SUCCESS" || update.status === "SUCCESS") {
+        if (update.cashback > 0) {
+          setCashbackAmount(update.cashback);
+          setCashbackMessage(`₹${update.cashback} cashback credited to wallet`);
+          refetchWallet();
+        }
+        if (plan?.validityDays) {
+          setExpiryDate(new Date(Date.now() + plan.validityDays * 86400000).toISOString());
+          setDaysLeft(plan.validityDays);
+        }
+      }
+      if (update.status === "REFUNDED" || update.status === "RECHARGE_FAILED") {
+        refetchWallet();
+      }
+    };
+
+    socket.on("recharge_status", onStatus);
+    return () => socket.off("recharge_status", onStatus);
+  }, [socket, done, plan, refetchWallet]);
 
   const reset = () => {
     setStep(1); setOp(null); setNumber(""); setPlan(null);
@@ -432,7 +574,23 @@ export default function Recharge() {
     setCouponCode(""); setAppliedCoupon(null); setCouponError("");
     setCashbackAmount(0); setCashbackMessage("");
     setDone(false);
+    setLiveStatus("RECHARGE_PROCESSING");
+    setLiveMessage("");
+    pendingRechargeId.current = null;
   };
+
+  const isProcessingLive = [
+    "RECHARGE_PROCESSING",
+    "PAYMENT_PENDING",
+    "PAYMENT_SUCCESS",
+    "REFUND_PROCESSING",
+    "PROCESSING",
+    "PENDING"
+  ].includes(liveStatus);
+
+  const isSuccessLive = liveStatus === "RECHARGE_SUCCESS" || liveStatus === "SUCCESS";
+  const isFailedLive = liveStatus === "RECHARGE_FAILED" || liveStatus === "FAILED";
+  const isRefundedLive = liveStatus === "REFUNDED";
 
   // Card number formatter: adds space every 4 digits
   const formatCard = (val) => val.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
@@ -446,21 +604,44 @@ export default function Recharge() {
   if (done) return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-10 max-w-sm w-full text-center">
-        <div className="text-5xl mb-4 animate-bounce">⏳</div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Recharge Initiated!</h2>
+        <div className={`text-5xl mb-4 ${isProcessingLive ? "animate-pulse" : ""}`}>
+          {isSuccessLive ? "✅" : isRefundedLive ? "↩️" : isFailedLive ? "❌" : "⏳"}
+        </div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">
+          {isSuccessLive
+            ? "Recharge Successful!"
+            : isFailedLive
+              ? "Recharge Failed"
+              : isRefundedLive
+                ? "Refund Completed"
+                : "Recharge In Progress"}
+        </h2>
         <p className="text-slate-400 text-sm mb-1">
-          Your recharge for <span className="font-semibold text-slate-700">+91 {number}</span> is being processed.
+          +91 {number} · {op?.name || "Operator"}
         </p>
         <p className="text-sky-600 font-extrabold text-3xl my-4">₹{finalAmount}</p>
         <p className="text-slate-400 text-xs mb-2">{plan?.data} · {plan?.validity}</p>
         
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-left flex items-start gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-lg flex-shrink-0">
-            ℹ️
+        <div className={`rounded-xl p-4 mb-6 text-left flex items-start gap-3 border ${
+          isSuccessLive
+            ? "bg-emerald-50 border-emerald-100"
+            : isFailedLive || isRefundedLive
+              ? "bg-rose-50 border-rose-100"
+              : "bg-indigo-50 border-indigo-100"
+        }`}>
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-lg flex-shrink-0">
+            {isProcessingLive && (
+              <span className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin block" />
+            )}
           </div>
           <div>
-            <p className="text-blue-700 font-bold text-sm">Status: Processing</p>
-            <p className="text-blue-600 text-[11px]">We are confirming your recharge with the operator. You can track the live status in your history.</p>
+            <p className="font-bold text-sm text-slate-800">
+              {liveStatus.replace(/_/g, " ")}
+            </p>
+            <p className="text-[11px] text-slate-600 mt-1">{liveMessage}</p>
+            {cashbackMessage && isSuccessLive && (
+              <p className="text-[11px] text-emerald-700 mt-1 font-semibold">{cashbackMessage}</p>
+            )}
           </div>
         </div>
 

@@ -26,13 +26,38 @@ const walletTransactionSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['PENDING', 'SUCCESS', 'FAILED'],
+    enum: ['PENDING', 'SUCCESS', 'FAILED', 'REFUNDED'],
     default: 'SUCCESS'
   },
   paymentMethod: {
     type: String,
     enum: ['UPI', 'CARD', 'NET_BANKING', 'WALLET', 'NONE'],
     default: 'NONE'
+  },
+  paymentGateway: {
+    type: String,
+    enum: ['RAZORPAY', 'STRIPE', 'NONE'],
+    default: 'NONE'
+  },
+  paymentId: {
+    type: String,
+    sparse: true
+  },
+  orderId: {
+    type: String,
+    sparse: true,
+    index: true
+  },
+  signature: {
+    type: String,
+    sparse: true
+  },
+  gatewayStatus: {
+    type: String,
+    default: 'PENDING'
+  },
+  gatewayResponse: {
+    type: mongoose.Schema.Types.Mixed
   },
   amount: {
     type: Number,
@@ -42,11 +67,20 @@ const walletTransactionSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Recharge'
   },
+  refundReference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'WalletTransaction'
+  },
   description: {
     type: String,
     default: ''
   }
 }, { timestamps: true });
+
+walletTransactionSchema.index(
+  { referenceId: 1, type: 1, status: 1 },
+  { partialFilterExpression: { type: 'REFUND', status: 'SUCCESS' } }
+);
 
 export const WalletTransaction = mongoose.model('WalletTransaction', walletTransactionSchema);
 

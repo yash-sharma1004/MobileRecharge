@@ -11,5 +11,7 @@ router.get('/', rechargeController.getHistory);
 router.get('/last', rechargeController.getLastRecharge);
 router.get('/expiry', rechargeController.getExpiry);
 router.post('/retry/:rechargeId', rechargeController.retryRecharge);
+router.get('/coupons', rechargeController.getCoupons);
+router.get('/offers', rechargeController.getOffers);
 
 export default router;

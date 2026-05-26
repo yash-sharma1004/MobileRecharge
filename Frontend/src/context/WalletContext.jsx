@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { useSocket } from './SocketContext';
 import api from '../utils/api';
 
 const WalletContext = createContext();
@@ -11,8 +12,8 @@ export const WalletProvider = ({ children }) => {
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletHistory, setWalletHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const socket = useSocket();
 
-  // Fetch wallet data from backend
   const fetchWallet = useCallback(async () => {
     if (!isAuthenticated) {
       setWalletBalance(0);
@@ -38,33 +39,40 @@ export const WalletProvider = ({ children }) => {
     fetchWallet();
   }, [fetchWallet]);
 
-  // Optimistic update for cashback (actual credit happens server-side during recharge)
+  useEffect(() => {
+    if (!socket) return;
+
+    const onWalletUpdated = (payload) => {
+      if (typeof payload.balance === 'number') {
+        setWalletBalance(payload.balance);
+      }
+      fetchWallet();
+    };
+
+    const onPaymentStatus = () => {
+      fetchWallet();
+    };
+
+    socket.on('wallet_updated', onWalletUpdated);
+    socket.on('payment_status', onPaymentStatus);
+    return () => {
+      socket.off('wallet_updated', onWalletUpdated);
+      socket.off('payment_status', onPaymentStatus);
+    };
+  }, [socket, fetchWallet]);
+
   const addCashback = useCallback((amount) => {
-    setWalletBalance(prev => prev + amount);
-    setWalletHistory(prev => [{
-      _id: Date.now().toString(),
-      type: 'CASHBACK',
-      amount,
-      createdAt: new Date().toISOString()
-    }, ...prev]);
+    setWalletBalance((prev) => prev + amount);
   }, []);
 
-  // Optimistic update for wallet deduction (actual deduction happens server-side)
   const deductWallet = useCallback((amount) => {
-    setWalletBalance(prev => prev - amount);
-    setWalletHistory(prev => [{
-      _id: Date.now().toString(),
-      type: 'RECHARGE',
-      amount,
-      createdAt: new Date().toISOString()
-    }, ...prev]);
+    setWalletBalance((prev) => prev - amount);
   }, []);
 
-  // Create a payment order on the backend
   const createTopUpOrder = useCallback(async (amount) => {
     try {
       setLoading(true);
-      const res = await api.post('/wallet/create-order', { amount: Number(amount) });
+      const res = await api.post('/payment/create-order', { amount: Number(amount) });
       return res;
     } catch (err) {
       console.error('Failed to create top-up order:', err);
@@ -74,27 +82,36 @@ export const WalletProvider = ({ children }) => {
     }
   }, []);
 
-  // Verify a payment order on the backend
-  const verifyTopUpPayment = useCallback(async (orderId, paymentMethod) => {
-    try {
-      setLoading(true);
-      const res = await api.post('/wallet/verify-payment', { orderId, paymentMethod });
-      await fetchWallet();
-      return res;
-    } catch (err) {
-      console.error('Failed to verify top-up payment:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchWallet]);
+  const verifyTopUpPayment = useCallback(
+    async (verificationPayload) => {
+      try {
+        setLoading(true);
+        const res = await api.post('/payment/verify', verificationPayload);
+        await fetchWallet();
+        return res;
+      } catch (err) {
+        console.error('Failed to verify top-up payment:', err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [fetchWallet]
+  );
 
   return (
-    <WalletContext.Provider value={{ 
-      walletBalance, walletHistory, addCashback, deductWallet, 
-      createTopUpOrder, verifyTopUpPayment,
-      loading, refetchWallet: fetchWallet 
-    }}>
+    <WalletContext.Provider
+      value={{
+        walletBalance,
+        walletHistory,
+        addCashback,
+        deductWallet,
+        createTopUpOrder,
+        verifyTopUpPayment,
+        loading,
+        refetchWallet: fetchWallet
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );

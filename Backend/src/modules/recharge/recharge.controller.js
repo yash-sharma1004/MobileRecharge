@@ -1,6 +1,8 @@
 import * as rechargeService from './recharge.service.js';
 import { createRechargeSchema } from './recharge.validation.js';
 import { AppError } from '../../utils/AppError.js';
+import { Coupon } from './coupon.model.js';
+import { Offer } from './offer.model.js';
 
 export const createRecharge = async (req, res, next) => {
   try {
@@ -9,7 +11,7 @@ export const createRecharge = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Recharge successful',
+      message: result.message || 'Recharge initiated — processing with operator',
       data: result
     });
   } catch (error) {
@@ -64,6 +66,30 @@ export const retryRecharge = async (req, res, next) => {
       success: true,
       message: 'Retry recharge initiated',
       data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCoupons = async (req, res, next) => {
+  try {
+    const coupons = await Coupon.find({ isActive: true, expiry: { $gt: new Date() } });
+    res.status(200).json({
+      success: true,
+      data: coupons
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getOffers = async (req, res, next) => {
+  try {
+    const offers = await Offer.find({ isActive: true });
+    res.status(200).json({
+      success: true,
+      data: offers
     });
   } catch (error) {
     next(error);

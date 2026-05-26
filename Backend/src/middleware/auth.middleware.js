@@ -21,6 +21,10 @@ export const protect = async (req, res, next) => {
       return next(new AppError('The user belonging to this token does no longer exist.', 401));
     }
 
+    if (currentUser.status === 'BLOCKED') {
+      return next(new AppError('Your account has been blocked by the Administrator.', 403));
+    }
+
     req.user = currentUser;
     next();
   } catch (error) {

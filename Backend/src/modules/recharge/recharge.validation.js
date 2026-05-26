@@ -17,5 +17,9 @@ export const createRechargeSchema = z.object({
   couponCode: z.string().optional().nullable(),
   referralCode: z.string().optional().nullable(),
   useWallet: z.boolean().optional().nullable(),
-  walletAmountUsed: z.number().optional().nullable()
+  walletAmountUsed: z.number().optional().nullable(),
+  paymentOrderId: z.string().optional().nullable(),
+  planId: z.string().optional().nullable(),
+  category: z.enum(['mobile', 'broadband', 'utility']).optional().nullable(),
+  parentRechargeId: z.string().optional().nullable()
 });

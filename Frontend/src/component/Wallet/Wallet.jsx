@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "../../context/WalletContext";
+import { loadRazorpay } from "../../utils/loadRazorpay";
 
 export default function Wallet() {
   const { 
@@ -20,6 +21,11 @@ export default function Wallet() {
   const [processing, setProcessing] = useState(false);
   const [paymentResult, setPaymentResult] = useState(null); // 'SUCCESS' | 'FAILED' | null
   const [modalError, setModalError] = useState("");
+
+  // Load Razorpay on mount
+  useEffect(() => {
+    loadRazorpay();
+  }, []);
 
   const handleCreateOrder = async () => {
     setError("");
@@ -47,7 +53,114 @@ export default function Wallet() {
         setPaymentResult(null);
         setModalError("");
         setProcessing(false);
-        setShowModal(true);
+
+        // Check if we are using placeholder/mock credentials
+        const isMockMode = 
+          !import.meta.env.VITE_RAZORPAY_KEY || 
+          import.meta.env.VITE_RAZORPAY_KEY.includes('YOUR_KEY_ID');
+
+        if (isMockMode && res.data.orderId.startsWith('order_mock_')) {
+          console.log("ℹ️ Placeholder keys detected. Running in mock Razorpay simulator mode.");
+          
+          // Open our existing premium modal in processing state
+          setShowModal(true);
+          setProcessing(true);
+          setPaymentResult(null);
+          setModalError("");
+
+          // Simulate bank payment delay
+          setTimeout(async () => {
+            try {
+              const verifyRes = await verifyTopUpPayment({
+                razorpay_order_id: res.data.orderId,
+                razorpay_payment_id: `pay_mock_${Date.now()}`,
+                razorpay_signature: "mock_signature_approved"
+              });
+
+              if (verifyRes.success) {
+                setPaymentResult("SUCCESS");
+                setAddAmount("");
+              } else {
+                setPaymentResult("FAILED");
+                setModalError(verifyRes.message || "Simulated verification failed.");
+              }
+            } catch (err) {
+              setPaymentResult("FAILED");
+              setModalError(err.data?.message || err.message || "Simulated payment verification failed.");
+            } finally {
+              setProcessing(false);
+            }
+          }, 1500);
+
+          return;
+        }
+
+        // Load Razorpay dynamically
+        const sdkLoaded = await loadRazorpay();
+        if (!sdkLoaded) {
+          setError("Failed to load Razorpay SDK. Please check your network connection.");
+          return;
+        }
+
+        // Open official Razorpay Checkout popup
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_dummyKeyId",
+          amount: res.data.amount * 100, // Amount in paisa
+          currency: res.data.currency || "INR",
+          name: "MobileRecharge",
+          description: "Wallet Top-up",
+          order_id: res.data.orderId,
+          handler: async function (response) {
+            try {
+              setShowModal(true);
+              setProcessing(true);
+              setPaymentResult(null);
+              setModalError("");
+
+              // Verify payment with backend signature verification
+              const verifyRes = await verifyTopUpPayment({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              });
+
+              if (verifyRes.success) {
+                setPaymentResult("SUCCESS");
+                setAddAmount("");
+              } else {
+                setPaymentResult("FAILED");
+                setModalError(verifyRes.message || "Payment signature verification failed.");
+              }
+            } catch (err) {
+              setPaymentResult("FAILED");
+              setModalError(err.data?.message || err.message || "Payment verification failed.");
+            } finally {
+              setProcessing(false);
+            }
+          },
+          prefill: {
+            name: "Premium Customer",
+            email: "customer@example.com",
+            contact: "9999999999"
+          },
+          theme: {
+            color: "#4f46e5" // Premium Indigo
+          },
+          modal: {
+            ondismiss: function () {
+              console.log("Razorpay popup closed by customer.");
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on("payment.failed", function (response) {
+          setShowModal(true);
+          setPaymentResult("FAILED");
+          setModalError(response.error.description || "The transaction was declined by the gateway.");
+        });
+        rzp.open();
+
       } else {
         setError(res.message || "Failed to initiate payment.");
       }
@@ -58,28 +171,8 @@ export default function Wallet() {
     }
   };
 
-  const handleConfirmPayment = async () => {
-    if (!currentOrder) return;
-    setProcessing(true);
-    setModalError("");
-
-    // Simulate standard payment processing screen delay (2 seconds)
-    setTimeout(async () => {
-      try {
-        const res = await verifyTopUpPayment(currentOrder.orderId, paymentMethod);
-        if (res.success) {
-          setPaymentResult("SUCCESS");
-          setAddAmount("");
-        } else {
-          setPaymentResult("FAILED");
-        }
-      } catch (err) {
-        setPaymentResult("FAILED");
-        setModalError(err.data?.message || err.message || "Payment verification failed.");
-      } finally {
-        setProcessing(false);
-      }
-    }, 2000);
+  const handleConfirmPayment = () => {
+    // Deprecated for real Razorpay checkout
   };
 
   const handleCloseModal = () => {

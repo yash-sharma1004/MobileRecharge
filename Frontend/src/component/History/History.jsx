@@ -110,7 +110,7 @@ Amount Paid    : ₹${record.amount}
                   <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 mt-2 sm:mt-0 pt-4 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                     <p className="font-black text-xl text-slate-900 font-display">₹{record.amount}</p>
                     <div className="flex gap-2">
-                      {(record.status === 'FAILED' || record.status === 'REFUNDED') && (
+                      {(record.status === 'RECHARGE_FAILED' || record.status === 'FAILED') && (
                         <RetryButton rechargeId={record._id || record.id} />
                       )}
                       <button 
@@ -137,11 +137,17 @@ Amount Paid    : ₹${record.amount}
 
 function StatusBadge({ status }) {
   const configs = {
+    PAYMENT_PENDING: { color: 'bg-amber-50 border-amber-100/50 text-amber-600', label: 'Payment Pending', dot: 'bg-amber-400' },
+    PAYMENT_SUCCESS: { color: 'bg-sky-50 border-sky-100/50 text-sky-600', label: 'Paid', dot: 'bg-sky-500' },
+    RECHARGE_PROCESSING: { color: 'bg-indigo-50 border-indigo-100/50 text-indigo-600', label: 'Processing', dot: 'bg-indigo-500 animate-pulse' },
+    RECHARGE_SUCCESS: { color: 'bg-emerald-50 border-emerald-100/50 text-emerald-600', label: 'Success', dot: 'bg-emerald-500' },
+    RECHARGE_FAILED: { color: 'bg-rose-50 border-rose-100/50 text-rose-600', label: 'Failed', dot: 'bg-rose-500' },
+    REFUND_PROCESSING: { color: 'bg-purple-50 border-purple-100/50 text-purple-600', label: 'Refunding', dot: 'bg-purple-400 animate-pulse' },
+    REFUNDED: { color: 'bg-purple-50 border-purple-100/50 text-purple-600', label: 'Refunded', dot: 'bg-purple-500' },
     PENDING: { color: 'bg-amber-50 border-amber-100/50 text-amber-600', label: 'Pending', dot: 'bg-amber-400' },
     PROCESSING: { color: 'bg-indigo-50 border-indigo-100/50 text-indigo-600', label: 'Processing', dot: 'bg-indigo-500 animate-pulse' },
     SUCCESS: { color: 'bg-emerald-50 border-emerald-100/50 text-emerald-600', label: 'Success', dot: 'bg-emerald-500' },
     FAILED: { color: 'bg-rose-50 border-rose-100/50 text-rose-600', label: 'Failed', dot: 'bg-rose-500' },
-    REFUNDED: { color: 'bg-purple-50 border-purple-100/50 text-purple-600', label: 'Refunded', dot: 'bg-purple-500' },
     Success: { color: 'bg-emerald-50 border-emerald-100/50 text-emerald-600', label: 'Success', dot: 'bg-emerald-500' },
   };
 
@@ -166,7 +172,7 @@ function RetryButton({ rechargeId }) {
       alert('Retry initiated successfully!');
       refetchHistory();
     } catch (err) {
-      alert(err.response?.data?.message || 'Retry failed');
+      alert(err.data?.message || err.message || 'Retry failed');
     } finally {
       setLoading(false);
     }

@@ -40,6 +40,11 @@ const userSchema = new mongoose.Schema({
     enum: ['USER', 'ADMIN'],
     default: 'USER'
   },
+  status: {
+    type: String,
+    enum: ['ACTIVE', 'BLOCKED'],
+    default: 'ACTIVE'
+  },
   isEmailVerified: {
     type: Boolean,
     default: false
