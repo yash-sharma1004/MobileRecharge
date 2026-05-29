@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:5000/api/v1';
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+// const API_BASE=`http://localhost:5000/api/v1`
 
 /**
  * Makes an authenticated API request.
@@ -17,7 +19,7 @@ const api = async (endpoint, options = {}) => {
   };
 
   const res = await fetch(`${API_BASE}${endpoint}`, config);
-  
+
   let data;
   try {
     data = await res.json();
