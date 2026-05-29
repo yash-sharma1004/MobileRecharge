@@ -7,8 +7,6 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
-import { auth } from "../../config/firebase.config";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 // ── Icons ──
 const EyeOn = () => (
@@ -155,7 +153,6 @@ function Countdown({ onExpire }) {
 // ── Main Component ──
 export default function Login() {
   const [mode, setMode] = useState("password"); // "password" | "otp"
-  const [loginType, setLoginType] = useState("phone"); // "email" | "phone"
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -169,27 +166,8 @@ export default function Login() {
   const [step, setStep] = useState(1); // 1=credentials, 2=otp verify
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState("");
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaRef = useRef(null);
   const navigate = useNavigate();
   const { login: authLogin } = useAuth();
-
-  useEffect(() => {
-    return () => {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-      }
-    };
-  }, []);
-
-  const setupRecaptcha = () => {
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: () => { console.log('reCAPTCHA solved'); }
-      });
-    }
-  };
 
   const shake = () => {
     setShaking(true);
@@ -198,10 +176,8 @@ export default function Login() {
 
   const validate = () => {
     const e = {};
-    if (loginType === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier))
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier))
       e.identifier = "Enter a valid email address.";
-    if (loginType === "phone" && !/^[6-9]\d{9}$/.test(identifier))
-      e.identifier = "Enter a valid 10-digit mobile number.";
     if (mode === "password" && password.length < 6)
       e.password = "Password must be at least 6 characters.";
     return e;
@@ -215,24 +191,14 @@ export default function Login() {
     setApiError("");
 
     try {
-      if (loginType === "phone") {
-        // --- Firebase Phone Auth Flow ---
-        setupRecaptcha();
-        const appVerifier = window.recaptchaVerifier;
-        const formattedPhone = `+91${identifier}`; // Assuming Indian numbers
-
-        const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-        setConfirmationResult(result);
-      } else {
-        // --- Legacy Backend Email OTP Flow ---
-        const res = await fetch("http://localhost:5000/api/v1/auth/login-otp/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || "Failed to send OTP.");
-      }
+      // --- Legacy Backend Email OTP Flow ---
+      const res = await fetch("http://localhost:5000/api/v1/auth/login-otp/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || "Failed to send OTP.");
 
       setOtpSent(true);
       setStep(2);
@@ -243,11 +209,6 @@ export default function Login() {
       setApiError(err.message || "Failed to send OTP. Please check your connection.");
       setLoading(false);
       shake();
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.render().then(widgetId => {
-          window.grecaptcha.reset(widgetId);
-        });
-      }
     }
   };
 
@@ -301,28 +262,13 @@ export default function Login() {
     setApiError("");
 
     try {
-      let data;
-      if (loginType === "phone" && confirmationResult) {
-        // 1. Verify with Firebase
-        const firebaseResult = await confirmationResult.confirm(otpValue);
-        const idToken = await firebaseResult.user.getIdToken();
-
-        // 2. Verify with Backend
-        const res = await fetch("http://localhost:5000/api/v1/auth/firebase-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken })
-        });
-        data = await res.json();
-      } else {
-        // --- Legacy Backend Email OTP Flow ---
-        const res = await fetch("http://localhost:5000/api/v1/auth/login-otp/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier, otp: otpValue })
-        });
-        data = await res.json();
-      }
+      // --- Legacy Backend Email OTP Flow ---
+      const res = await fetch("http://localhost:5000/api/v1/auth/login-otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, otp: otpValue })
+      });
+      const data = await res.json();
 
       if (!data.success) {
         setErrors({ otp: data.message || "Invalid OTP." });
@@ -392,7 +338,6 @@ export default function Login() {
         </div>
 
         {/* Card */}
-        <div id="recaptcha-container"></div>
         <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden ${shaking ? "shake" : ""}`}>
 
           {/* Progress bar top */}
@@ -418,7 +363,7 @@ export default function Login() {
               </div>
               <p className="text-slate-400 text-sm">
                 {step === 2
-                  ? `OTP sent to your ${loginType}.`
+                  ? "OTP sent to your email."
                   : <>Don't have an account?{" "}
                       <a href="/signUp" className="text-sky-500 font-semibold hover:underline">Sign Up</a>
                     </>
@@ -437,39 +382,10 @@ export default function Login() {
             {step === 1 && (
               <div className="slide-up space-y-5">
 
-                {/* Login type toggle */}
-                <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
-                  {[
-                    { key: "email", label: "Email",  icon: <MailIcon /> },
-                    { key: "phone", label: "Mobile", icon: <PhoneIcon /> },
-                  ].map(t => (
-                    <button key={t.key} onClick={() => { setLoginType(t.key); setIdentifier(""); setErrors({}); setApiError(""); }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all duration-200
-                        ${loginType === t.key ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"}`}
-                    >
-                      {t.icon} {t.label}
-                    </button>
-                  ))}
-                </div>
-
                 {/* Identifier input */}
-                {loginType === "phone" ? (
-                  <div>
-                    <div className={`flex items-center border rounded-xl transition-all duration-200 bg-white
-                      ${errors.identifier ? "border-red-300 ring-2 ring-red-100" : "border-slate-200 hover:border-slate-300 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-100"}`}>
-                      <span className="pl-4 text-slate-400"><PhoneIcon /></span>
-                      <span className="pl-3 pr-2 text-slate-400 text-sm font-medium border-r border-slate-200 py-4">+91</span>
-                      <input type="tel" placeholder="Mobile number" maxLength={10}
-                        value={identifier} onChange={e => { setIdentifier(e.target.value.replace(/\D/g,"")); setErrors({}); setApiError(""); }}
-                        className="flex-1 px-3 py-4 text-sm text-slate-800 bg-transparent outline-none" />
-                    </div>
-                    {errors.identifier && <p className="text-red-400 text-xs mt-1.5 ml-1">⚠ {errors.identifier}</p>}
-                  </div>
-                ) : (
-                  <FloatInput id="email" label="Email address" type="email" value={identifier}
-                    onChange={e => { setIdentifier(e.target.value); setErrors({}); setApiError(""); }}
-                    icon={<MailIcon />} error={errors.identifier} />
-                )}
+                <FloatInput id="email" label="Email address" type="email" value={identifier}
+                  onChange={e => { setIdentifier(e.target.value); setErrors({}); setApiError(""); }}
+                  icon={<MailIcon />} error={errors.identifier} />
 
                  
                 {/* Mode toggle */}
@@ -569,7 +485,7 @@ export default function Login() {
                     <p className="text-sky-500 text-xs mt-0.5">
                       We've sent a 6-digit code to{" "}
                       <span className="font-bold">
-                        {loginType === "phone" ? `+91 ${identifier}` : identifier}
+                        {identifier}
                       </span>
                     </p>
                   </div>
@@ -590,7 +506,7 @@ export default function Login() {
                   )}
                   <button onClick={() => { setStep(1); setOtpSent(false); setOtp(["","","","","",""]); setErrors({}); }}
                     className="text-slate-400 text-sm hover:text-slate-600 transition-colors">
-                    ← Change {loginType}
+                    ← Change Email
                   </button>
                 </div>
 

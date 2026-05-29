@@ -4,7 +4,6 @@ import { AppError } from '../../utils/AppError.js';
 import { Referral } from '../referral/referral.model.js';
 import { Wallet } from '../wallet/wallet.model.js';
 import { WalletTransaction } from '../wallet/walletTransaction.model.js';
-import { adminAuth } from '../../config/firebase.js';
 
 export const registerUser = async (userData) => {
   const existingMobile = await User.findOne({ mobile: userData.mobile });
@@ -95,10 +94,6 @@ export const loginUser = async (credentials) => {
     throw new AppError('Invalid mobile/email or password', 401);
   }
 
-  if (user.authProvider === 'firebase' && !user.passwordHash) {
-    throw new AppError('This account is registered via Mobile OTP. Please login using OTP.', 401);
-  }
-
   const isPasswordValid = await user.comparePassword(credentials.password);
   if (!isPasswordValid) {
     throw new AppError('Invalid mobile/email or password', 401);
@@ -116,55 +111,6 @@ const generateToken = (userId) => {
   });
 };
 
-export const firebaseLogin = async (idToken) => {
-  try {
-    // 1. Verify the Firebase ID Token
-    const decodedToken = await adminAuth().verifyIdToken(idToken);
-    const { uid, phone_number, name } = decodedToken;
-
-    if (!phone_number) {
-      throw new AppError('Firebase authentication failed: No phone number associated with this account', 400);
-    }
-
-    // 2. Extract 10-digit mobile number from E.164 (e.g., +919876543210 -> 9876543210)
-    const mobile = phone_number.replace(/\D/g, '').slice(-10);
-
-    // 3. Find or Create User
-    let user = await User.findOne({
-      $or: [{ firebaseUid: uid }, { mobile: mobile }]
-    });
-
-    if (!user) {
-      // Create new user if not found
-      user = await User.create({
-        mobile,
-        name: name || 'User', // Firebase might not provide name for phone auth initially
-        firebaseUid: uid,
-        authProvider: 'firebase',
-        passwordHash: 'FIREBASE_AUTH' // Placeholder (not required by schema for firebase provider)
-      });
-    } else {
-      // Update existing user with firebase info if missing
-      if (!user.firebaseUid) {
-        user.firebaseUid = uid;
-        user.authProvider = 'firebase';
-        await user.save();
-      }
-    }
-
-    // 4. Generate Application JWT
-    const token = generateToken(user._id);
-
-    const { passwordHash, ...userWithoutPassword } = user._doc;
-    return { user: userWithoutPassword, token };
-  } catch (error) {
-    console.error('Firebase Auth Error:', error.message);
-    if (error.code === 'auth/id-token-expired') {
-      throw new AppError('Firebase session expired. Please try again.', 401);
-    }
-    throw new AppError(error.message || 'Firebase authentication failed', 401);
-  }
-};
 
 const generateResetToken = (userId) => {
   return jwt.sign({ id: userId, reset: true }, process.env.JWT_SECRET, {
@@ -230,9 +176,8 @@ export const sendLoginOTP = async ({ identifier }) => {
       );
 
     } else {
-
       throw new AppError(
-        'Phone OTP delivery is managed by Firebase.',
+        'Phone OTP login is not supported. Please use email OTP.',
         400
       );
     }
@@ -313,7 +258,7 @@ export const sendForgotPasswordOTP = async ({ identifier }) => {
   if (identifier.includes('@')) {
     await sendOTPEmail(identifier, plainOtp, 'FORGOT_PASSWORD');
   } else {
-    throw new AppError('Phone OTP delivery is now managed by Firebase on the frontend.', 400);
+    throw new AppError('Phone OTP is not supported. Please use your email to reset password.', 400);
   }
 
   return { message: 'Password reset OTP sent successfully' };
@@ -344,36 +289,6 @@ export const verifyForgotPasswordOTP = async ({ identifier, otp }) => {
   return { resetToken, message: 'OTP verified successfully. You can now reset your password.' };
 };
 
-export const verifyFirebaseResetToken = async (idToken) => {
-  try {
-    // 1. Verify the Firebase ID Token
-    const decodedToken = await adminAuth().verifyIdToken(idToken);
-    const { uid, phone_number } = decodedToken;
-
-    if (!phone_number) {
-      throw new AppError('Firebase verification failed: No phone number associated with this account', 400);
-    }
-
-    // 2. Extract mobile number
-    const mobile = phone_number.replace(/\D/g, '').slice(-10);
-
-    // 3. Find User
-    const user = await User.findOne({
-      $or: [{ firebaseUid: uid }, { mobile: mobile }]
-    });
-
-    if (!user) {
-      throw new AppError('No account found with this mobile number', 404);
-    }
-
-    // 4. Generate Reset Token
-    const resetToken = generateResetToken(user._id);
-
-    return { resetToken, message: 'Identity verified successfully. You can now reset your password.' };
-  } catch (error) {
-    throw new AppError(error.message || 'Firebase verification failed', 401);
-  }
-};
 
 // Reset Password
 export const resetPassword = async ({ resetToken, newPassword }) => {

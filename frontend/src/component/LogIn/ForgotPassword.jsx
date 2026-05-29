@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { auth } from "../../config/firebase.config";
-import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+
 
 export default function ForgotPassword() {
   const [identifier, setIdentifier] = useState("");
@@ -34,38 +33,25 @@ export default function ForgotPassword() {
 
   const handleSendOtp = async (e) => {
     e?.preventDefault();
-    if (!identifier) { setError("Please enter your mobile or email"); return; }
+    if (!identifier) { setError("Please enter your email"); return; }
+    if (!identifier.includes("@")) { setError("Please enter a valid email address."); return; }
     
     setLoading(true);
     setError("");
 
     try {
-      const isEmail = identifier.includes("@");
-
-      if (isEmail) {
-        const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || "Failed to send OTP");
-      } else {
-        // Firebase Phone Auth
-        setupRecaptcha();
-        const appVerifier = window.recaptchaVerifier;
-        const formattedPhone = `+91${identifier.replace(/\D/g, "")}`;
-        const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-        setConfirmationResult(result);
-      }
+      const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier })
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || "Failed to send OTP");
       
       setStep(2);
     } catch (err) {
       console.error("Forgot Pw OTP Error:", err);
       setError(err.message || "Failed to send OTP.");
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.render().then(widgetId => window.grecaptcha.reset(widgetId));
-      }
     } finally {
       setLoading(false);
     }
@@ -79,31 +65,12 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      let data;
-      const isEmail = identifier.includes("@");
-
-      if (isEmail) {
-        const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier, otp: otpCode })
-        });
-        data = await res.json();
-      } else if (confirmationResult) {
-        // 1. Verify with Firebase
-        const firebaseResult = await confirmationResult.confirm(otpCode);
-        const idToken = await firebaseResult.user.getIdToken();
-
-        // 2. Verify with Backend
-        const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/verify-firebase", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken })
-        });
-        data = await res.json();
-      } else {
-        throw new Error("Verification session expired. Please resend OTP.");
-      }
+      const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, otp: otpCode })
+      });
+      const data = await res.json();
 
       if (!data.success) throw new Error(data.message || "Invalid OTP");
       
@@ -159,11 +126,10 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-12">
-      <div id="recaptcha-container"></div>
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden w-full max-w-sm p-8">
         <h1 className="text-2xl font-bold text-slate-800 mb-2">Forgot Password</h1>
         <p className="text-slate-500 text-sm mb-6">
-          {step === 1 && "Enter your email or phone to reset password."}
+          {step === 1 && "Enter your email to reset password."}
           {step === 2 && `Enter the OTP sent to ${identifier}.`}
           {step === 3 && "Set your new password."}
         </p>
@@ -173,8 +139,8 @@ export default function ForgotPassword() {
         {step === 1 && (
           <form onSubmit={handleSendOtp}>
             <input 
-              type="text" 
-              placeholder="Email or Mobile" 
+              type="email" 
+              placeholder="Email address" 
               value={identifier} 
               onChange={e => setIdentifier(e.target.value)} 
               className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 mb-4 text-sm"

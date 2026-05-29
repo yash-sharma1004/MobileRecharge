@@ -25,14 +25,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: function() { return this.authProvider === 'password'; }
   },
-  firebaseUid: {
-    type: String,
-    unique: true,
-    sparse: true
-  },
   authProvider: {
     type: String,
-    enum: ['password', 'firebase'],
+    enum: ['password'],
     default: 'password'
   },
   role: {

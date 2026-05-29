@@ -8,9 +8,7 @@ import {
   verifyLoginOTP,
   sendForgotPasswordOTP,
   verifyForgotPasswordOTP,
-  verifyFirebaseResetToken,
-  resetPassword,
-  firebaseLogin
+  resetPassword
 } from './auth.controller.js';
 
 const router = express.Router();
@@ -24,7 +22,6 @@ const otpRateLimiter = rateLimit({
 
 router.post('/register', register);
 router.post('/login', login);
-router.post('/firebase-login', firebaseLogin);
 router.post('/logout', logout);
 
 // OTP Login Routes
@@ -34,7 +31,6 @@ router.post('/login-otp/verify', verifyLoginOTP);
 // Forgot Password Routes
 router.post('/forgot-password/send', otpRateLimiter, sendForgotPasswordOTP);
 router.post('/forgot-password/verify', verifyForgotPasswordOTP);
-router.post('/forgot-password/verify-firebase', verifyFirebaseResetToken);
 router.post('/forgot-password/reset', resetPassword);
 
 export default router;

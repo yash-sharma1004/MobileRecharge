@@ -51,22 +51,6 @@ export const login = async (req, res, next) => {
   }
 };
 
-export const firebaseLogin = async (req, res, next) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) throw new AppError('Firebase ID Token is required', 400);
-
-    const result = await authService.firebaseLogin(idToken);
-
-    res.status(200).json({
-      success: true,
-      message: 'Firebase login successful',
-      data: result
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 // ---------------------------------------------------------
 // OTP CONTROLLERS
@@ -120,17 +104,6 @@ export const verifyForgotPasswordOTP = async (req, res, next) => {
   }
 };
 
-export const verifyFirebaseResetToken = async (req, res, next) => {
-  try {
-    const { idToken } = req.body;
-    if (!idToken) throw new AppError('Firebase ID Token is required', 400);
-
-    const result = await authService.verifyFirebaseResetToken(idToken);
-    res.status(200).json({ success: true, ...result });
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const resetPassword = async (req, res, next) => {
   try {
