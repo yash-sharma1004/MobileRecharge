@@ -8,15 +8,26 @@ import { useWallet } from "../../context/WalletContext";
 import { useHistory } from "../../context/HistoryContext";
 import api from "../../utils/api";
 
+import mobileImg from "../../assets/mobile.png";
+import cardImg from "../../assets/card.jpg";
+import broadbandImg from "../../assets/broadband.jpg";
+import landlineImg from "../../assets/landline.jpg";
+import cabletvImg from "../../assets/cabletv.png";
+import electricityImg from "../../assets/electricity.jpg";
+import gasImg from "../../assets/gas.jpg";
+import waterImg from "../../assets/water.jpg";
+import airtelLogo from "../../assets/Airtel.png";
+import jioLogo from "../../assets/Jio.png";
+
 const services = [
-  { id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge with VoltTap." },
-  { id: "2", name: "Card", icon: <FaCreditCard />, src: "./src/assets/card.jpg", description: " Get up to 20% Cashback on your first card recharge." },
-  { id: "3", name: "Broadband", icon: <FaWifi />, src: "./src/assets/broadband.jpg", description: " Get up to 20% Cashback on your first broadband recharge." },
-  { id: "4", name: "Landline", icon: <FaPhoneAlt />, src: "./src/assets/landline.jpg", description: " Get up to 20% Cashback on your first landline recharge." },
-  { id: "5", name: "Cable TV", icon: <FaTv />, src: "./src/assets/cabletv.png", description: " Get up to 20% Cashback on your first cable tv recharge." },
-  { id: "6", name: "Electricity", icon: <FaLightbulb />, src: "./src/assets/electricity.jpg", description: " Get up to 20% Cashback on your first electricity recharge." },
-  { id: "7", name: "Gas", icon: <FaGasPump />, src: "./src/assets/gas.jpg", description: " Get up to 20% Cashback on your first gas recharge." },
-  { id: "8", name: "Water", icon: <FaTint />, src: "./src/assets/water.jpg", description: " Get up to 20% Cashback on your first water bill recharge." },
+  { id: "1", name: "Mobile", icon: <FaMobileAlt />, src: mobileImg, description: " Get up to 20% Cashback on your first mobile recharge with VoltTap." },
+  { id: "2", name: "Card", icon: <FaCreditCard />, src: cardImg, description: " Get up to 20% Cashback on your first card recharge." },
+  { id: "3", name: "Broadband", icon: <FaWifi />, src: broadbandImg, description: " Get up to 20% Cashback on your first broadband recharge." },
+  { id: "4", name: "Landline", icon: <FaPhoneAlt />, src: landlineImg, description: " Get up to 20% Cashback on your first landline recharge." },
+  { id: "5", name: "Cable TV", icon: <FaTv />, src: cabletvImg, description: " Get up to 20% Cashback on your first cable tv recharge." },
+  { id: "6", name: "Electricity", icon: <FaLightbulb />, src: electricityImg, description: " Get up to 20% Cashback on your first electricity recharge." },
+  { id: "7", name: "Gas", icon: <FaGasPump />, src: gasImg, description: " Get up to 20% Cashback on your first gas recharge." },
+  { id: "8", name: "Water", icon: <FaTint />, src: waterImg, description: " Get up to 20% Cashback on your first water bill recharge." },
 ];
 
 const card = [
@@ -24,12 +35,12 @@ const card = [
     id: 1,
     title: "Airtel",
     offer: "20% off",
-    img: "./src/assets/Airtel.png"
+    img: airtelLogo
   },
   {
     id: 2,
     title: 'jio',
-    img: "./src/assets/Jio.png"
+    img: jioLogo
   }
 ];
 
@@ -174,7 +185,7 @@ export default function Hero() {
     fetchOffers();
   }, []);
 
-  const [activeTab, setActiveTab] = useState({ id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge with VoltTap." });
+  const [activeTab, setActiveTab] = useState({ id: "1", name: "Mobile", icon: <FaMobileAlt />, src: mobileImg, description: " Get up to 20% Cashback on your first mobile recharge with VoltTap." });
 
   const activeOffers = dbOffers.filter(o => o.category === activeTab.name.toLowerCase());
 
@@ -341,21 +352,21 @@ export default function Hero() {
 
       const planData = selectedPlan
         ? {
-            price: finalAmt,
-            data: selectedPlan.details.data,
-            calls: selectedPlan.details.calls,
-            validity: selectedPlan.details.validity,
-            validityDays: selectedPlan.details.validity.includes("Days") ? parseInt(selectedPlan.details.validity) : 0,
-            tag: selectedPlan.details.tag
-          }
+          price: finalAmt,
+          data: selectedPlan.details.data,
+          calls: selectedPlan.details.calls,
+          validity: selectedPlan.details.validity,
+          validityDays: selectedPlan.details.validity.includes("Days") ? parseInt(selectedPlan.details.validity) : 0,
+          tag: selectedPlan.details.tag
+        }
         : {
-            price: finalAmt,
-            data: `${activeTab.name} Payment`,
-            calls: "N/A",
-            validity: "Instant Transaction",
-            validityDays: 0,
-            tag: "QuickPay"
-          };
+          price: finalAmt,
+          data: `${activeTab.name} Payment`,
+          calls: "N/A",
+          validity: "Instant Transaction",
+          validityDays: 0,
+          tag: "QuickPay"
+        };
 
       const payload = {
         operator: operator,

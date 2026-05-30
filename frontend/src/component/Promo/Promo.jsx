@@ -1,12 +1,17 @@
 import React from 'react';
+import airtelLogo from '../../assets/Airtel.png';
+import viLogo from '../../assets/Vi.png';
+import jioLogo from '../../assets/Jio.png';
+import bsnlLogo from '../../assets/Bsnl.png';
+import ideaLogo from '../../assets/Idea.png';
 
 const promos = [
-  { id: 1, name: "Airtel Special", code: "AIR50", logo: "./src/assets/Airtel.png" },
-  { id: 2, name: "VI Super Saver", code: "VI50", logo: "./src/assets/Vi.png" },
-  { id: 3, name: "Jio Unlimited", code: "JIO30", logo: "./src/assets/Jio.png" },
-  { id: 4, name: "BSNL Topup", code: "BSNL10", logo: "./src/assets/Bsnl.png" },
-  { id: 5, name: "Idea Cashback", code: "IDEA25", logo: "./src/assets/Idea.png" },
-  { id: 6, name: "Exclusive Pay", code: "XYZ99", logo: "./src/assets/Vi.png" },
+  { id: 1, name: "Airtel Special", code: "AIR50", logo: airtelLogo },
+  { id: 2, name: "VI Super Saver", code: "VI50", logo: viLogo },
+  { id: 3, name: "Jio Unlimited", code: "JIO30", logo: jioLogo },
+  { id: 4, name: "BSNL Topup", code: "BSNL10", logo: bsnlLogo },
+  { id: 5, name: "Idea Cashback", code: "IDEA25", logo: ideaLogo },
+  { id: 6, name: "Exclusive Pay", code: "XYZ99", logo: viLogo },
 ];
 
 function Promo() {
@@ -28,16 +33,16 @@ function Promo() {
       {/* PROMO GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto px-6">
         {promos.map((promo) => (
-          <div 
+          <div
             key={promo.id}
             className="group flex justify-between items-center p-6 border border-slate-200/60 rounded-3xl hover:border-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 transform transition-all duration-300 bg-white shadow-sm"
           >
             {/* LOGO CONTAINER */}
             <div className="flex items-center justify-center w-24 h-14 bg-slate-50/50 rounded-xl p-2 border border-slate-100">
-              <img 
-                className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300" 
-                src={promo.logo} 
-                alt={promo.name} 
+              <img
+                className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                src={promo.logo}
+                alt={promo.name}
               />
             </div>
 
