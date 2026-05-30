@@ -20,7 +20,7 @@ export default function ScrollToTop() {
       const originalRestoration = window.history.scrollRestoration;
       window.history.scrollRestoration = "manual";
       console.log(`[ScrollToTop] Configured browser scroll restoration to 'manual' (previous: '${originalRestoration}')`);
-      
+
       return () => {
         window.history.scrollRestoration = originalRestoration;
         console.log(`[ScrollToTop] Restored browser scroll restoration to '${originalRestoration}'`);
@@ -71,7 +71,7 @@ export default function ScrollToTop() {
       performScrollReset();
       rafId2 = requestAnimationFrame(() => {
         performScrollReset();
-        
+
         // Log final scroll positions once all layout passes have settled
         const postWindowY = window.scrollY || window.pageYOffset;
         const postDocElementY = document.documentElement.scrollTop;
