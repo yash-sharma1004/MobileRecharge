@@ -9,7 +9,7 @@ import { useHistory } from "../../context/HistoryContext";
 import api from "../../utils/api";
 
 const services = [
-  { id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge with FastPay." },
+  { id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge with VoltTap." },
   { id: "2", name: "Card", icon: <FaCreditCard />, src: "./src/assets/card.jpg", description: " Get up to 20% Cashback on your first card recharge." },
   { id: "3", name: "Broadband", icon: <FaWifi />, src: "./src/assets/broadband.jpg", description: " Get up to 20% Cashback on your first broadband recharge." },
   { id: "4", name: "Landline", icon: <FaPhoneAlt />, src: "./src/assets/landline.jpg", description: " Get up to 20% Cashback on your first landline recharge." },
@@ -174,7 +174,7 @@ export default function Hero() {
     fetchOffers();
   }, []);
 
-  const [activeTab, setActiveTab] = useState({ id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge with FastPay." });
+  const [activeTab, setActiveTab] = useState({ id: "1", name: "Mobile", icon: <FaMobileAlt />, src: "./src/assets/mobile.png", description: " Get up to 20% Cashback on your first mobile recharge with VoltTap." });
 
   const activeOffers = dbOffers.filter(o => o.category === activeTab.name.toLowerCase());
 

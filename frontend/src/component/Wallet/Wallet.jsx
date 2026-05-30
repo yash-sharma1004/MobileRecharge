@@ -107,7 +107,7 @@ export default function Wallet() {
           key: import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_dummyKeyId",
           amount: res.data.amount * 100, // Amount in paisa
           currency: res.data.currency || "INR",
-          name: "FastPay",
+          name: "VoltTap",
           description: "Wallet Top-up",
           order_id: res.data.orderId,
           handler: async function (response) {

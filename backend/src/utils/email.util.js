@@ -55,16 +55,16 @@ export const sendOTPEmail = async (to, otp, purpose) => {
   try {
     const transport = await getTransporter();
 
-    let subject = 'Your FastPay OTP';
+    let subject = 'Your VoltTap OTP';
     let text = `Your OTP is ${otp}. It is valid for 5 minutes.`;
     let html = `<p>Your OTP is <b>${otp}</b>.</p><p>It is valid for 5 minutes. Do not share this code with anyone.</p>`;
 
     if (purpose === 'FORGOT_PASSWORD') {
-      subject = 'FastPay Password Reset OTP';
+      subject = 'VoltTap Password Reset OTP';
       text = `Your password reset OTP is ${otp}. It is valid for 5 minutes.`;
       html = `<p>You requested a password reset. Your OTP is <b>${otp}</b>.</p><p>It is valid for 5 minutes.</p>`;
     } else if (purpose === 'LOGIN') {
-      subject = 'FastPay Login OTP';
+      subject = 'VoltTap Login OTP';
     }
 
     console.log(`Attempting to send email from: ${process.env.EMAIL_FROM || process.env.SMTP_USER}`);

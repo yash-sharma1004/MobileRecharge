@@ -69,7 +69,7 @@ export default function Refer() {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'Join FastPay & Earn!',
+        title: 'Join VoltTap & Earn!',
         text: `Use my referral code ${referralCode} to get started and we both earn rewards!`,
         url: window.location.origin,
       }).catch(console.error);

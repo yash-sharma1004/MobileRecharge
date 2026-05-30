@@ -1,4 +1,4 @@
-// Login.jsx — FastPay | Advanced Login Section
+// Login.jsx — VoltTap | Advanced Login Section
 // Features: floating labels, OTP mode, animated bg blobs, shake on error,
 //           show/hide password, remember me, social login, live input validation
 // Stack: React + Tailwind CSS
@@ -294,7 +294,7 @@ export default function Login() {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center max-w-sm w-full">
         <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-5 text-3xl">✅</div>
         <h2 className="text-xl font-bold text-slate-800 mb-2">Welcome back!</h2>
-        <p className="text-slate-600 text-sm mb-7">You're logged in to FastPay.</p>
+        <p className="text-slate-600 text-sm mb-7">You're logged in to VoltTap.</p>
         <button onClick={() => navigate("/")}
           className="w-full py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm transition-all">
           Go to Dashboard →
@@ -332,7 +332,7 @@ export default function Login() {
         <div className="flex items-center justify-center gap-2 mb-8">
           <img 
             src={logo} 
-            alt="FastPay Logo" 
+            alt="VoltTap Logo" 
             className="h-10 w-auto object-contain"
           />
         </div>
@@ -523,7 +523,7 @@ export default function Login() {
 
         {/* Footer note */}
         <p className="text-center text-slate-400 text-xs mt-6">
-          © {new Date().getFullYear()} FastPay Pvt. Ltd.
+          © {new Date().getFullYear()} VoltTap Pvt. Ltd.
         </p>
       </div>
     </div>

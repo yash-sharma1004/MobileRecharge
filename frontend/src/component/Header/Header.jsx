@@ -1,4 +1,4 @@
-// Header.jsx — FastPay App Header
+// Header.jsx — VoltTap App Header
 // Matches footer color scheme: white bg, slate text, sky-500 accent
 // Responsive: hamburger menu on mobile, full nav on desktop
 // Stack: React + Tailwind CSS
@@ -133,7 +133,7 @@ export default function Header() {
             <Link to="/" className="flex items-center gap-2 shrink-0 group">
               <img 
                 src={logo} 
-                alt="FastPay Logo" 
+                alt="VoltTap Logo" 
                 className="h-10 w-auto sm:h-11.5 md:h-13.5 object-contain group-hover:scale-[1.03] transition-all duration-300"
               />
             </Link>

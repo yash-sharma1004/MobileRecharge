@@ -1,4 +1,4 @@
-// ContactUs.jsx — FastPay | Advanced Contact Section
+// ContactUs.jsx — VoltTap | Advanced Contact Section
 // Theme: White/slate/gray + sky blue (matches header, footer, about)
 // Features: floating labels, animated cards, FAQ accordion, char counter,
 //           contact method selector, success animation, scroll reveals
@@ -124,7 +124,7 @@ function MethodCard({ method, active, onClick, delay }) {
 // ── Data ──
 const contactMethods = [
   { id: "chat",  icon: "💬", title: "Live Chat",     desc: "Talk to our team instantly",    value: "Avg. reply in 2 min",    badge: "Fastest", bg: "bg-sky-100",     activeBg: "bg-sky-200" },
-  { id: "email", icon: "✉️", title: "Email Support", desc: "Send us a detailed query",      value: "support@fastpay.in", badge: null,      bg: "bg-violet-100",  activeBg: "bg-violet-200" },
+  { id: "email", icon: "✉️", title: "Email Support", desc: "Send us a detailed query",      value: "support@volttap.in", badge: null,      bg: "bg-violet-100",  activeBg: "bg-violet-200" },
   { id: "phone", icon: "📞", title: "Call Us",       desc: "Speak to our support team",     value: "+91-1800-XXX-XXXX",      badge: "24/7",    bg: "bg-emerald-100", activeBg: "bg-emerald-200" },
   { id: "whatsapp", icon: "💚", title: "WhatsApp",   desc: "Chat on WhatsApp anytime",      value: "+91-98765-XXXXX",        badge: "Popular", bg: "bg-green-100",   activeBg: "bg-green-200" },
 ];
@@ -133,7 +133,7 @@ const faqs = [
   { q: "How long does a recharge take?",            a: "Most recharges complete in under 3 seconds. In rare cases with operator delays, it may take up to 2 minutes." },
   { q: "My recharge failed but money was deducted?", a: "Don't worry — failed recharges are auto-refunded within 24–48 hours to your original payment method. You can also track status in My Orders." },
   { q: "Which operators are supported?",             a: "We support Jio, Airtel, Vi (Vodafone Idea), BSNL, MTNL, and 45+ other telecom operators across India." },
-  { q: "How do I get my cashback?",                 a: "Cashback is credited to your FastPay wallet within 24 hours of a successful recharge. You can use it on your next recharge." },
+  { q: "How do I get my cashback?",                 a: "Cashback is credited to your VoltTap wallet within 24 hours of a successful recharge. You can use it on your next recharge." },
   { q: "Is my payment information secure?",          a: "Yes. All transactions use 256-bit SSL encryption and are PCI-DSS compliant. We never store your card details." },
   { q: "Can I recharge for someone else?",           a: "Absolutely! Just enter the mobile number you want to recharge — it doesn't have to be your own number." },
 ];
@@ -347,7 +347,7 @@ export default function ContactUs() {
                     </div>
                   </div>
                   <p className="text-slate-800 text-sm leading-relaxed">
-                    FastPay HQ<br />
+                    VoltTap HQ<br />
                     12th Floor, Tower B, Cyber City<br />
                     Gurugram, Haryana — 122002
                   </p>

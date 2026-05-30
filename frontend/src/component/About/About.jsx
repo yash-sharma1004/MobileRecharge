@@ -1,4 +1,4 @@
-// About.jsx — FastPay | Advanced About Section
+// About.jsx — VoltTap | Advanced About Section
 // Theme: White/slate/gray + sky blue accent (matches header & footer)
 // Features: scroll animations, counter animation, hover transforms, tab switching, timeline
 // Stack: React + Tailwind CSS
@@ -58,7 +58,7 @@ const values = [
 ];
 
 const timeline = [
-  { year: "2018", title: "Founded",        desc: "FastPay was born with a mission to make digital payments instant for India." },
+  { year: "2018", title: "Founded",        desc: "VoltTap was born with a mission to make digital payments instant for India." },
   { year: "2019", title: "1M Users",       desc: "Crossed 1 million users within 12 months of launch." },
   { year: "2021", title: "All Operators",  desc: "Expanded to cover all 50+ telecom operators across India." },
   { year: "2022", title: "Cashback Added", desc: "Launched industry-first guaranteed cashback on every recharge." },
@@ -199,7 +199,7 @@ export default function About() {
             }`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-            About FastPay
+            About VoltTap
           </div>
 
           <h1
@@ -217,7 +217,7 @@ export default function About() {
               heroInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
             }`}
           >
-            Since 2018, FastPay has been India's most trusted platform for instant mobile, DTH, and broadband recharges — serving 24 million+ satisfied customers across the country.
+            Since 2018, VoltTap has been India's most trusted platform for instant mobile, DTH, and broadband recharges — serving 24 million+ satisfied customers across the country.
           </p>
 
           {/* CTA pills */}
@@ -368,7 +368,7 @@ export default function About() {
                   Built to make recharging effortless for every Indian
                 </h2>
                 <p className="text-black text-[15px] leading-relaxed">
-                  FastPay was founded in 2018 with one clear goal — eliminate the frustration of mobile recharges and digital payments. Long queues, failed transactions, and confusing plan comparisons were holding millions of Indians back from staying connected.
+                  VoltTap was founded in 2018 with one clear goal — eliminate the frustration of mobile recharges and digital payments. Long queues, failed transactions, and confusing plan comparisons were holding millions of Indians back from staying connected.
                 </p>
                 <p className="text-black text-[15px] leading-relaxed">
                   Today, we're a team of 200+ passionate engineers, designers, and support specialists building technology that just works — every time. From a student in Pune to a businessman in Delhi, we serve everyone with the same speed and reliability.
@@ -388,7 +388,7 @@ export default function About() {
                   <div className="flex items-center gap-3 mb-6">
                     <img 
                       src={logo} 
-                      alt="FastPay Logo" 
+                      alt="VoltTap Logo" 
                       className="h-10 w-auto object-contain"
                     />
                   </div>
@@ -489,7 +489,7 @@ export default function About() {
         <div className="max-w-3xl mx-auto px-6 text-center relative z-10">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4">Ready to recharge smarter?</h2>
           <p className="text-sky-100 text-[15px] mb-8 max-w-xl mx-auto">
-            Join 24 million Indians who trust FastPay for fast, secure, and rewarding recharges every day.
+            Join 24 million Indians who trust VoltTap for fast, secure, and rewarding recharges every day.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <a href="#"

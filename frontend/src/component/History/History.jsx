@@ -15,7 +15,7 @@ export default function History() {
   const downloadInvoice = (record) => {
     const invoiceContent = `
 =================================
-       FASTPAY PAYMENT RECEIPT    
+       VOLTTAP PAYMENT RECEIPT    
 =================================
 
 Transaction ID : ${record.id}
@@ -32,7 +32,7 @@ Payment Method : ${record.payMethod || "N/A"}
 Amount Paid    : ₹${record.amount}
 
 =================================
-     Thank you for using FastPay!
+     Thank you for using VoltTap!
 =================================
     `;
     const blob = new Blob([invoiceContent], { type: "text/plain" });

@@ -1,4 +1,4 @@
-// SignUp.jsx — FastPay | Simple & Clean
+// SignUp.jsx — VoltTap | Simple & Clean
 // Stack: React + Tailwind CSS
 
 import { useState } from "react";
@@ -106,7 +106,7 @@ export default function SignUp() {
         <div className="flex items-center justify-center gap-2 mb-8">
           <img 
             src={logo} 
-            alt="FastPay Logo" 
+            alt="VoltTap Logo" 
             className="h-10 w-auto object-contain"
           />
         </div>
@@ -252,7 +252,7 @@ export default function SignUp() {
 
         {/* Bottom */}
         <p className="text-center text-slate-400 text-xs mt-6">
-          © {new Date().getFullYear()} FastPay Pvt. Ltd.
+          © {new Date().getFullYear()} VoltTap Pvt. Ltd.
         </p>
       </div>
     </div>

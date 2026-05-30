@@ -15,7 +15,7 @@ import { seedDB } from '../src/config/seeder.js';
 
 // Setup Mock Environment Variables in case they are missing
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'supersecretjwtkey123';
-process.env.MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/fastpay';
+process.env.MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/volttap';
 
 async function runTests() {
   console.log('🧪 CONNECTING TO MONGODB:', process.env.MONGO_URI);

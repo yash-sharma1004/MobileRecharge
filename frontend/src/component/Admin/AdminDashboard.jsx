@@ -72,7 +72,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black font-display tracking-tight text-slate-800">System Overview</h1>
-          <p className="text-slate-500 text-xs mt-1">Real-time FastPay payment platform analytics and control console.</p>
+          <p className="text-slate-500 text-xs mt-1">Real-time VoltTap payment platform analytics and control console.</p>
         </div>
         <div className="bg-white border border-slate-200/60 px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-semibold text-slate-700 shadow-sm w-fit">
           <Sparkles className="text-sky-500 w-4 h-4" />

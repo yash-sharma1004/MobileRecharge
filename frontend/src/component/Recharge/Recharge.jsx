@@ -1,4 +1,4 @@
-// Recharge.jsx — FastPay
+// Recharge.jsx — VoltTap
 // 4-step flow: Operator → Number → Plan → Payment
 // Stack: React + Tailwind CSS
 
@@ -424,7 +424,7 @@ export default function Recharge() {
               key: import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_dummyKeyId",
               amount: order.amount * 100,
             currency: order.currency || "INR",
-            name: "FastPay",
+            name: "VoltTap",
             description: `Recharge Payment for +91 ${number}`,
             order_id: order.orderId,
             handler: async function (response) {
@@ -668,7 +668,7 @@ export default function Recharge() {
         <div className="flex items-center justify-center gap-2 mb-8">
           <img 
             src={logo} 
-            alt="FastPay Logo" 
+            alt="VoltTap Logo" 
             className="h-10 w-auto object-contain"
           />
         </div>
@@ -733,7 +733,7 @@ export default function Recharge() {
                     }}
                     className="flex-1 sm:flex-none px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-600/10 transition-all flex items-center gap-1 justify-center cursor-pointer"
                   >
-                    <span>⚡</span> Fast Pay
+                    <span>⚡</span> Volt Tap
                   </button>
                 </div>
               </div>
