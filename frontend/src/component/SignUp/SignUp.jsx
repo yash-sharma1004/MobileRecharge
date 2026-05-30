@@ -107,7 +107,7 @@ export default function SignUp() {
           <img 
             src={logo} 
             alt="VoltTap Logo" 
-            className="h-10 w-auto object-contain"
+            className="h-24 w-auto object-contain"
           />
         </div>
 

@@ -13,6 +13,7 @@ import History from './component/History/History'
 import SignUp from './component/SignUp/SignUp'
 import ProtectedRoute from './component/ProtectedRoute'
 import Refer from './component/Refer&Earn/Refer'
+import ScrollToTop from './component/ScrollToTop'
 
 // Admin Panel Imports
 import AdminRoute from './component/Admin/AdminRoute'
@@ -29,6 +30,7 @@ import AdminOffers from './component/Admin/AdminOffers'
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
@@ -54,7 +56,7 @@ function App() {
           <Route path="refer" element={
             <ProtectedRoute><Refer /></ProtectedRoute>
           } />
-          
+
           {/* Isolated Admin Routes */}
           <Route path="admin" element={
             <AdminRoute><AdminLayout /></AdminRoute>
