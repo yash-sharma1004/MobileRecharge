@@ -134,7 +134,7 @@ export default function Header() {
               <img 
                 src={logo} 
                 alt="VoltTap Logo" 
-                className="h-10 w-auto sm:h-11.5 md:h-13.5 object-contain group-hover:scale-[1.03] transition-all duration-300"
+                className="h-11.5 w-auto sm:h-13.5 md:h-15.5 object-contain group-hover:scale-[1.03] transition-all duration-300 filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
               />
             </Link>
 

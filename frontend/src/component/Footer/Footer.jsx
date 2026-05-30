@@ -87,7 +87,7 @@ export default function Footer() {
 
   return (
     <footer className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-300 border-t border-slate-900 relative overflow-hidden">
-      
+
       {/* Decorative ambient background glows */}
       <div className="absolute top-0 left-1/4 w-80 h-80 bg-indigo-500/5 blur-[120px] pointer-events-none rounded-full" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-sky-500/5 blur-[140px] pointer-events-none rounded-full" />
@@ -96,7 +96,7 @@ export default function Footer() {
       <div className="max-w-6xl mx-auto px-6 pt-16 pb-4">
         <div className="bg-white/5 border border-white/10 rounded-[2rem] p-8 sm:p-12 backdrop-blur-md shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-8 relative overflow-hidden">
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
-          
+
           {/* Left Text */}
           <div className="flex items-start gap-4 max-w-xl">
             <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center flex-shrink-0 shadow-md shadow-sky-500/5">
@@ -146,13 +146,13 @@ export default function Footer() {
 
           {/* Brand Info Panel */}
           <div className="lg:col-span-2 space-y-6">
-            
+
             {/* Unified Logo */}
             <div className="flex items-center gap-3 font-display">
-              <img 
-                src={logo} 
-                alt="VoltTap Logo" 
-                className="h-12 w-auto object-contain hover:scale-[1.03] transition-transform duration-300"
+              <img
+                src={logo}
+                alt="VoltTap Logo"
+                className="h-16 md:h-20 w-auto object-contain hover:scale-[1.03] transition-transform duration-300"
               />
             </div>
 
@@ -231,7 +231,7 @@ export default function Footer() {
       {/* ── Footer Bottom Section ── */}
       <div className="bg-slate-950 border-t border-slate-900/60 relative z-10">
         <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          
+
           {/* Social icons */}
           <div className="flex items-center gap-4 flex-wrap justify-center">
             <span className="text-[10px] text-slate-500 uppercase tracking-widest font-black font-display">
