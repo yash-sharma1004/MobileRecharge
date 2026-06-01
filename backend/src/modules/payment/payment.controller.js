@@ -55,6 +55,40 @@ export const verifyPayment = async (req, res, next) => {
   }
 };
 
+export const verifyRechargePayment = async (req, res, next) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Order ID, Payment ID, and Signature are required'
+      });
+    }
+
+    const verificationResult = await paymentService.verifyRechargePayment(req.user._id, {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Direct recharge payment verified successfully',
+      data: {
+        status: verificationResult.status,
+        transaction: verificationResult.transaction,
+        recharge: verificationResult.recharge
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || 'Payment verification failed'
+    });
+  }
+};
+
 export const handleWebhook = async (req, res, next) => {
   try {
     const signature = req.headers['x-razorpay-signature'];

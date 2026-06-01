@@ -30,6 +30,7 @@ export const addCashback = async (userId, amount, description = 'Cashback earned
   const txn = await WalletTransaction.create({
     userId,
     type: 'CASHBACK',
+    direction: 'CREDIT',
     purpose: 'CASHBACK',
     status: 'SUCCESS',
     amount,
@@ -51,6 +52,7 @@ export const deductBalance = async (userId, amount, description = 'Wallet redeem
   const txn = await WalletTransaction.create({
     userId,
     type: 'RECHARGE',
+    direction: 'DEBIT',
     purpose: 'RECHARGE',
     status: 'SUCCESS',
     amount,
@@ -77,6 +79,7 @@ export const createOrder = async (userId, amount) => {
   const txn = await WalletTransaction.create({
     userId,
     type: 'TOP_UP',
+    direction: 'CREDIT',
     purpose: 'TOP_UP',
     status: 'PENDING',
     amount,

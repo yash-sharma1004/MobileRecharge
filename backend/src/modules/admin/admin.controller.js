@@ -209,6 +209,7 @@ export const adjustUserWallet = async (req, res, next) => {
     await WalletTransaction.create({
       userId: id,
       type: operation === 'DEDUCT' ? 'RECHARGE' : 'TOP_UP',
+      direction: operation === 'DEDUCT' ? 'DEBIT' : 'CREDIT',
       purpose: operation === 'DEDUCT' ? 'RECHARGE' : 'TOP_UP',
       amount: changeAmt,
       status: 'SUCCESS',

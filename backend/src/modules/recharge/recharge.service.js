@@ -73,69 +73,63 @@ export const createRecharge = async (userId, data) => {
     throw new AppError('Invalid recharge amount after discounts', 400);
   }
 
-  const walletAmountRequired =
-    data.useWallet && data.walletAmountUsed > 0
-      ? Math.min(data.walletAmountUsed, finalAmount)
-      : finalAmount;
+  const isWalletPayment = data.payMethod === 'Wallet';
 
-  if (!data.useWallet || walletAmountRequired < finalAmount) {
-    throw new AppError(
-      'Full payment must be completed before recharge. Top up wallet via Razorpay first.',
-      400
-    );
+  if (isWalletPayment) {
+    // Standard Wallet Balance check
+    const walletAmountRequired =
+      data.useWallet && data.walletAmountUsed > 0
+        ? Math.min(data.walletAmountUsed, finalAmount)
+        : finalAmount;
+
+    if (!data.useWallet || walletAmountRequired < finalAmount) {
+      throw new AppError(
+        'Full payment must be completed before recharge. Please use the Wallet method.',
+        400
+      );
+    }
   }
 
   const txnId = `TXN${Date.now().toString().slice(-8)}${Math.floor(100 + Math.random() * 900)}`;
   const providerKey = resolveProviderKey(data.operator);
 
-  const recharge = await Recharge.create({
-    userId,
-    operator: data.operator,
-    number: data.number,
-    amount: finalAmount,
-    plan: data.plan,
-    planId: data.planId,
-    planData: data.planData,
-    payMethod: data.payMethod || 'UPI',
-    category:
-      data.category ||
-      (providerKey === 'broadband' ? 'broadband' : providerKey === 'electricity' ? 'utility' : 'mobile'),
-    status: 'PAYMENT_PENDING',
-    transactionId: txnId,
-    couponCode: couponCode || undefined,
-    paymentOrderId: data.paymentOrderId || undefined,
-    parentRechargeId: data.parentRechargeId || undefined
-  });
-
-  try {
-    emitStatus(userId, recharge, { message: 'Confirming payment…' });
-
-    const { transaction: debitTxn } = await walletLedger.debitWallet(userId, finalAmount, {
-      referenceId: recharge._id,
-      description: `Payment for ${data.operator} recharge`,
-      paymentMethod: data.payMethod === 'Wallet' ? 'WALLET' : 'UPI'
+  // If it's an external payment (UPI/Card/Net Banking), we do NOT debit the wallet balance!
+  // We create a pending Recharge record, generate a Razorpay payment order, and return order details.
+  if (!isWalletPayment) {
+    const recharge = await Recharge.create({
+      userId,
+      operator: data.operator,
+      number: data.number,
+      amount: finalAmount,
+      plan: data.plan,
+      planId: data.planId,
+      planData: data.planData,
+      payMethod: data.payMethod || 'UPI',
+      category:
+        data.category ||
+        (providerKey === 'broadband' ? 'broadband' : providerKey === 'electricity' ? 'utility' : 'mobile'),
+      status: 'PAYMENT_PENDING',
+      transactionId: txnId,
+      couponCode: couponCode || undefined,
+      parentRechargeId: data.parentRechargeId || undefined
     });
 
-    recharge.paymentId = debitTxn._id.toString();
-    recharge.status = 'PAYMENT_SUCCESS';
-    await recharge.save();
-    emitStatus(userId, recharge, { message: 'Payment verified' });
+    // Create direct Razorpay order for this recharge amount
+    const paymentService = await import('../payment/payment.service.js');
+    const orderData = await paymentService.createRechargeRazorpayOrder(recharge._id, finalAmount);
 
-    recharge.status = 'RECHARGE_PROCESSING';
-    recharge.providerResponse = {
-      provider: data.operator,
-      status: 'PROCESSING',
-      message: 'Submitting recharge to operator…',
-      queuedAt: new Date()
-    };
+    recharge.paymentOrderId = orderData.orderId;
     await recharge.save();
-    emitStatus(userId, recharge, { message: 'Recharge processing with operator…' });
-
-    processRechargeWithProvider(recharge._id, userId, hasCoupon).catch((err) => {
-      console.error('Provider processing error:', err);
-    });
 
     return {
+      success: true,
+      isExternalPayment: true,
+      order: {
+        orderId: orderData.orderId,
+        amount: orderData.amount,
+        currency: orderData.currency || 'INR',
+        status: orderData.status
+      },
       recharge: {
         id: recharge._id,
         transactionId: recharge.transactionId,
@@ -143,20 +137,103 @@ export const createRecharge = async (userId, data) => {
         number: recharge.number,
         amount: recharge.amount,
         status: recharge.status,
-        date: recharge.createdAt,
-        providerResponse: recharge.providerResponse
+        date: recharge.createdAt
       },
-      walletUsed: finalAmount,
+      walletUsed: 0,
       cashbackEarned: 0,
-      message: 'Recharge submitted to operator'
+      message: 'Direct payment order generated successfully'
     };
-  } catch (error) {
-    recharge.status = 'RECHARGE_FAILED';
-    recharge.failureReason = error.message;
-    await recharge.save();
-    emitStatus(userId, recharge, { message: error.message });
-    throw error;
   }
+
+  // 1. Run database creation and debit synchronously within a committed transaction session
+  const recharge = await walletLedger.runWithOptionalTransaction(async (session) => {
+    const rechargePayload = {
+      userId,
+      operator: data.operator,
+      number: data.number,
+      amount: finalAmount,
+      plan: data.plan,
+      planId: data.planId,
+      planData: data.planData,
+      payMethod: 'Wallet',
+      category:
+        data.category ||
+        (providerKey === 'broadband' ? 'broadband' : providerKey === 'electricity' ? 'utility' : 'mobile'),
+      status: 'PAYMENT_PENDING',
+      transactionId: txnId,
+      couponCode: couponCode || undefined,
+      parentRechargeId: data.parentRechargeId || undefined
+    };
+
+    const rechargeArray = session
+      ? await Recharge.create([rechargePayload], { session })
+      : [await Recharge.create(rechargePayload)];
+    const createdRecharge = rechargeArray[0];
+
+    emitStatus(userId, createdRecharge, { message: 'Confirming payment…' });
+
+    // Debit wallet balance inside session
+    const { transaction: debitTxn } = await walletLedger.debitWallet(userId, finalAmount, {
+      referenceId: createdRecharge._id,
+      description: `Payment for ${data.operator} recharge`,
+      paymentMethod: 'WALLET',
+      session
+    });
+
+    createdRecharge.paymentId = debitTxn._id.toString();
+    createdRecharge.status = 'PAYMENT_SUCCESS';
+    
+    if (session) {
+      await createdRecharge.save({ session });
+    } else {
+      await createdRecharge.save();
+    }
+    emitStatus(userId, createdRecharge, { message: 'Payment verified' });
+
+    createdRecharge.status = 'RECHARGE_PROCESSING';
+    createdRecharge.providerResponse = {
+      provider: data.operator,
+      status: 'PROCESSING',
+      message: 'Submitting recharge to operator…',
+      queuedAt: new Date()
+    };
+    
+    if (session) {
+      await createdRecharge.save({ session });
+    } else {
+      await createdRecharge.save();
+    }
+    emitStatus(userId, createdRecharge, { message: 'Recharge processing with operator…' });
+
+    return createdRecharge;
+  });
+
+  // 2. Transaction has committed successfully! The wallet is safely debited, and recharge record is saved.
+  // Now we safely await the operator gateway simulation (3–15 seconds) outside the transaction session.
+  try {
+    await processRechargeWithProvider(recharge._id, userId, hasCoupon);
+  } catch (err) {
+    console.error('Provider processing error:', err);
+  }
+
+  // 3. Fetch the final resolved state of the recharge record
+  const finalRecharge = await Recharge.findById(recharge._id);
+
+  return {
+    recharge: {
+      id: finalRecharge._id,
+      transactionId: finalRecharge.transactionId,
+      operator: finalRecharge.operator,
+      number: finalRecharge.number,
+      amount: finalRecharge.amount,
+      status: finalRecharge.status,
+      date: finalRecharge.createdAt,
+      providerResponse: finalRecharge.providerResponse
+    },
+    walletUsed: finalAmount,
+    cashbackEarned: finalRecharge.cashbackEarned || 0,
+    message: finalRecharge.status === 'RECHARGE_SUCCESS' ? 'Recharge completed successfully' : 'Recharge failed'
+  };
 };
 
 export const retryRecharge = async (userId, rechargeId) => {

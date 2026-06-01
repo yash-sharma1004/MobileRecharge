@@ -18,6 +18,11 @@ const walletTransactionSchema = new mongoose.Schema({
     enum: ['TOP_UP', 'RECHARGE', 'CASHBACK', 'REFUND', 'REFERRAL'],
     required: true
   },
+  direction: {
+    type: String,
+    enum: ['CREDIT', 'DEBIT'],
+    required: true
+  },
   purpose: {
     type: String,
     enum: ['TOP_UP', 'RECHARGE', 'CASHBACK', 'WALLET_REFUND', 'REFERRAL'],

@@ -24,5 +24,6 @@ router.post('/webhook', paymentController.handleWebhook);
 router.use(protect);
 router.post('/create-order', paymentRateLimiter, paymentController.createOrder);
 router.post('/verify', paymentRateLimiter, paymentController.verifyPayment);
+router.post('/verify-recharge', paymentRateLimiter, paymentController.verifyRechargePayment);
 
 export default router;

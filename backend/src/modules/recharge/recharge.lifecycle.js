@@ -114,6 +114,50 @@ export const processAutomaticRefund = async (rechargeId, userId) => {
   recharge.status = 'REFUND_PROCESSING';
   recharge.refundStatus = 'PENDING';
   await recharge.save();
+
+  const isWalletPayment = recharge.payMethod === 'Wallet';
+
+  if (!isWalletPayment) {
+    // External Gateway Refund (UPI/Card/Net Banking) — do NOT add money to user's wallet!
+    emitStatus(userId, recharge, { message: 'Processing gateway refund…' });
+    
+    // Create transaction history log (direction: CREDIT, type: REFUND, but wallet balance itself is unchanged!)
+    const { WalletTransaction } = await import('../wallet/walletTransaction.model.js');
+    const txn = await WalletTransaction.create({
+      userId,
+      type: 'REFUND',
+      direction: 'CREDIT',
+      purpose: 'WALLET_REFUND',
+      amount: recharge.amount,
+      status: 'SUCCESS',
+      paymentMethod: recharge.payMethod || 'UPI',
+      paymentGateway: 'RAZORPAY',
+      referenceId: recharge._id,
+      description: `Gateway refund for failed ${recharge.operator} recharge`
+    });
+
+    recharge.refundStatus = 'COMPLETED';
+    recharge.status = 'REFUNDED';
+    recharge.providerResponse = {
+      ...recharge.providerResponse,
+      refund: {
+        amount: recharge.amount,
+        completedAt: new Date(),
+        gatewayRefundId: `ref_mock_${Date.now()}`,
+        message: 'Direct gateway refund processed successfully to original payment method'
+      }
+    };
+    await recharge.save();
+
+    emitStatus(userId, recharge, {
+      message: 'Gateway refund completed successfully',
+      refunded: true
+    });
+
+    return recharge;
+  }
+
+  // Else, Wallet payment: credit back to wallet
   emitStatus(userId, recharge, { message: 'Processing refund to wallet…' });
 
   const refundResult = await walletLedger.refundRechargePayment(

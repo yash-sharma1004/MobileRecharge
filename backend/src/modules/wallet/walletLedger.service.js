@@ -4,7 +4,7 @@ import { WalletTransaction } from './walletTransaction.model.js';
 import { AppError } from '../../utils/AppError.js';
 import { emitToUser } from '../../config/socket.js';
 
-const runWithOptionalTransaction = async (fn) => {
+export const runWithOptionalTransaction = async (fn) => {
   let session = null;
   try {
     session = await mongoose.startSession();
@@ -38,14 +38,14 @@ const runWithOptionalTransaction = async (fn) => {
   }
 };
 
-export const debitWallet = async (userId, amount, { referenceId, description, paymentMethod = 'WALLET' }) => {
+export const debitWallet = async (userId, amount, { referenceId, description, paymentMethod = 'WALLET', session = null }) => {
   if (!amount || amount <= 0) {
     throw new AppError('Invalid debit amount', 400);
   }
 
-  return runWithOptionalTransaction(async (session) => {
+  const execute = async (activeSession) => {
     const walletQuery = Wallet.findOne({ userId });
-    if (session) walletQuery.session(session);
+    if (activeSession) walletQuery.session(activeSession);
     const wallet = await walletQuery;
 
     if (!wallet || wallet.balance < amount) {
@@ -53,8 +53,8 @@ export const debitWallet = async (userId, amount, { referenceId, description, pa
     }
 
     wallet.balance -= amount;
-    if (session) {
-      await wallet.save({ session });
+    if (activeSession) {
+      await wallet.save({ session: activeSession });
     } else {
       await wallet.save();
     }
@@ -62,6 +62,7 @@ export const debitWallet = async (userId, amount, { referenceId, description, pa
     const txnPayload = {
       userId,
       type: 'RECHARGE',
+      direction: 'DEBIT',
       purpose: 'RECHARGE',
       amount,
       status: 'SUCCESS',
@@ -71,8 +72,8 @@ export const debitWallet = async (userId, amount, { referenceId, description, pa
       description
     };
 
-    const txn = session
-      ? await WalletTransaction.create([txnPayload], { session }).then((r) => r[0])
+    const txn = activeSession
+      ? await WalletTransaction.create([txnPayload], { session: activeSession }).then((r) => r[0])
       : await WalletTransaction.create(txnPayload);
 
     emitToUser(userId, 'wallet_updated', {
@@ -83,7 +84,12 @@ export const debitWallet = async (userId, amount, { referenceId, description, pa
     });
 
     return { wallet, transaction: txn };
-  });
+  };
+
+  if (session) {
+    return execute(session);
+  }
+  return runWithOptionalTransaction(execute);
 };
 
 export const creditWallet = async (
@@ -105,6 +111,7 @@ export const creditWallet = async (
     const txnPayload = {
       userId,
       type,
+      direction: 'CREDIT',
       purpose,
       amount,
       status: 'SUCCESS',
@@ -175,6 +182,7 @@ export const refundRechargePayment = async (userId, rechargeId, description) => 
     const txnPayload = {
       userId,
       type: 'REFUND',
+      direction: 'CREDIT',
       purpose: 'WALLET_REFUND',
       amount: refundAmount,
       status: 'SUCCESS',

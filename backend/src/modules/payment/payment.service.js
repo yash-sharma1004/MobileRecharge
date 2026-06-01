@@ -376,6 +376,163 @@ export const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpa
 };
 
 /**
+ * Creates a Razorpay order for direct recharge payments.
+ */
+export const createRechargeRazorpayOrder = async (rechargeId, amount) => {
+  if (typeof amount !== 'number' || isNaN(amount)) {
+    throw new AppError('Amount must be a valid number', 400);
+  }
+
+  const isDummyKey = 
+    !process.env.RAZORPAY_KEY_ID || 
+    process.env.RAZORPAY_KEY_ID.includes('YOUR_KEY_ID') || 
+    process.env.RAZORPAY_KEY_ID.includes('dummy');
+
+  if (isDummyKey && process.env.NODE_ENV === 'production') {
+    throw new AppError('Razorpay credentials must be configured in production', 503);
+  }
+
+  if (isDummyKey && process.env.NODE_ENV !== 'production') {
+    console.log('ℹ️ Dev mode: local Razorpay direct recharge order simulation.');
+    const mockOrderId = `order_mock_${Date.now()}_${Math.floor(10000 + Math.random() * 90000)}`;
+    return {
+      orderId: mockOrderId,
+      amount,
+      currency: 'INR',
+      status: 'created'
+    };
+  }
+
+  // Create order via Razorpay API
+  try {
+    const rzpOrder = await razorpay.orders.create({
+      amount: Math.round(amount * 100), // Razorpay works in paisa
+      currency: 'INR',
+      receipt: `recharge_receipt_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`,
+      notes: {
+        rechargeId: rechargeId.toString(),
+        purpose: 'DIRECT_RECHARGE'
+      }
+    });
+
+    return {
+      orderId: rzpOrder.id,
+      amount,
+      currency: rzpOrder.currency,
+      status: rzpOrder.status
+    };
+  } catch (error) {
+    console.error('RAZORPAY RECHARGE ORDER ERROR:', error);
+    const detailMsg = error.message || (error.error && error.error.description) || 'Unknown Razorpay Gateway Error';
+    throw new AppError(`Failed to create recharge order: ${detailMsg}`, 500);
+  }
+};
+
+/**
+ * Verifies Razorpay payment for a direct recharge.
+ * Deducts NO wallet balance and credits NO wallet balance.
+ * Sets recharge status to PAYMENT_SUCCESS and logs a debit RECHARGE transaction for audit history.
+ */
+export const verifyRechargePayment = async (userId, { razorpay_order_id, razorpay_payment_id, razorpay_signature }) => {
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    throw new AppError('Missing required payment verification parameters', 400);
+  }
+
+  // Find the pending recharge by its Razorpay order id
+  const { Recharge } = await import('../recharge/recharge.model.js');
+  const recharge = await Recharge.findOne({ paymentOrderId: razorpay_order_id, userId });
+  if (!recharge) {
+    throw new AppError('Pending recharge order not found in database', 404);
+  }
+
+  if (recharge.status !== 'PAYMENT_PENDING') {
+    return { success: true, status: recharge.status, recharge };
+  }
+
+  const isMockMode =
+    process.env.NODE_ENV !== 'production' &&
+    (razorpay_order_id.startsWith('order_mock_') ||
+      (process.env.RAZORPAY_SECRET && process.env.RAZORPAY_SECRET.includes('YOUR_SECRET_KEY')));
+
+  if (!isMockMode) {
+    // Verify the signature
+    const keySecret = process.env.RAZORPAY_SECRET || 'dummySecretKey';
+    const hmac = crypto.createHmac('sha256', keySecret);
+    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const generatedSignature = hmac.digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
+      throw new AppError('Invalid payment signature. Verification failed.', 400);
+    }
+  }
+
+  // Fetch payment details from Razorpay to detect payment method
+  let paymentMethod = 'UPI';
+  let rawResponse = {};
+  if (!isMockMode) {
+    try {
+      const paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
+      rawResponse = paymentDetails;
+      if (paymentDetails.method) {
+        paymentMethod = paymentDetails.method.toUpperCase();
+        if (paymentMethod === 'NETBANKING') paymentMethod = 'NET_BANKING';
+      }
+    } catch (error) {
+      console.warn('Could not fetch payment details from Razorpay API:', error.message);
+    }
+  }
+
+  // Atomic update to PAYMENT_SUCCESS and log non-wallet debit RECHARGE transaction for audit
+  recharge.status = 'PAYMENT_SUCCESS';
+  recharge.paymentId = razorpay_payment_id;
+  await recharge.save();
+
+  // Create audit transaction (Type = RECHARGE, Direction = DEBIT, Wallet unchanged)
+  const txn = await WalletTransaction.create({
+    userId,
+    type: 'RECHARGE',
+    direction: 'DEBIT',
+    purpose: 'RECHARGE',
+    amount: recharge.amount,
+    status: 'SUCCESS',
+    paymentMethod,
+    paymentGateway: 'RAZORPAY',
+    paymentId: razorpay_payment_id,
+    orderId: razorpay_order_id,
+    referenceId: recharge._id,
+    description: `Direct recharge payment via ${paymentMethod}`
+  });
+
+  emitToUser(userId, 'recharge_status', {
+    rechargeId: recharge._id,
+    status: 'PAYMENT_SUCCESS',
+    message: 'Payment verified successfully'
+  });
+
+  // Trigger provider processing asynchronously outside database transaction block
+  recharge.status = 'RECHARGE_PROCESSING';
+  recharge.providerResponse = {
+    provider: recharge.operator,
+    status: 'PROCESSING',
+    message: 'Submitting recharge to operator…',
+    queuedAt: new Date()
+  };
+  await recharge.save();
+
+  const { processRechargeWithProvider } = await import('../provider/provider.service.js');
+  processRechargeWithProvider(recharge._id, userId, !!recharge.couponCode).catch((err) => {
+    console.error('Provider processing error:', err);
+  });
+
+  return {
+    success: true,
+    status: recharge.status,
+    transaction: txn,
+    recharge
+  };
+};
+
+/**
  * Handle optional Webhook events from Razorpay for reliability.
  */
 export const verifyAndProcessWebhook = async (signature, rawBody) => {

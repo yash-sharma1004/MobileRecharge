@@ -266,8 +266,8 @@ export default function Recharge() {
   const referralDiscount = appliedReferralCode ? 50 : 0;
 
   const baseFinalAmount = plan ? Math.max(0, plan.price - discountAmount - offerDiscount - referralDiscount) : 0;
-  const walletUsedAmount = useWalletBalance ? Math.min(globalWalletBalance, baseFinalAmount) : 0;
-  const finalAmount = baseFinalAmount - walletUsedAmount;
+  const walletUsedAmount = (payMethod === 'wallet' && useWalletBalance) ? Math.min(globalWalletBalance, baseFinalAmount) : 0;
+  const finalAmount = payMethod === 'wallet' ? baseFinalAmount - walletUsedAmount : baseFinalAmount;
 
   const handleApplyCoupon = () => {
     setCouponError("");
@@ -376,12 +376,150 @@ export default function Recharge() {
     setProcessing(true);
 
     try {
-      let finalWalletUsedAmount = walletUsedAmount;
-      let finalUseWallet = useWalletBalance;
+      const isWallet = payMethod === 'wallet';
 
-      // If there is a remaining balance to be paid via Razorpay
-      if (finalAmount > 0) {
-        // Load Razorpay dynamically
+      if (isWallet) {
+        let finalWalletUsedAmount = walletUsedAmount;
+        let finalUseWallet = useWalletBalance;
+
+        // If there is a remaining balance to be paid via Razorpay (top-up first)
+        if (finalAmount > 0) {
+          const sdkLoaded = await loadRazorpay();
+          if (!sdkLoaded) {
+            setProcessing(false);
+            alert("Failed to load Razorpay SDK. Please check your internet connection.");
+            return;
+          }
+
+          const orderRes = await createTopUpOrder(finalAmount);
+          if (!orderRes.success || !orderRes.data) {
+            throw new Error(orderRes.message || "Failed to create payment order.");
+          }
+
+          const order = orderRes.data;
+          const isMockMode = 
+            !import.meta.env.VITE_RAZORPAY_KEY || 
+            import.meta.env.VITE_RAZORPAY_KEY.includes('YOUR_KEY_ID');
+
+          let paymentPromise;
+          if (isMockMode && order.orderId.startsWith('order_mock_')) {
+            console.log("ℹ️ Placeholder keys detected. Running in mock Razorpay simulator mode.");
+            paymentPromise = (async () => {
+              await new Promise((resolve) => setTimeout(resolve, 1500));
+              return await verifyTopUpPayment({
+                razorpay_order_id: order.orderId,
+                razorpay_payment_id: `pay_mock_${Date.now()}`,
+                razorpay_signature: "mock_signature_approved"
+              });
+            })();
+          } else {
+            paymentPromise = new Promise((resolve, reject) => {
+              const options = {
+                key: import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_dummyKeyId",
+                amount: order.amount * 100,
+                currency: order.currency || "INR",
+                name: "VoltTap",
+                description: `Wallet Top-Up for Recharge (+91 ${number})`,
+                order_id: order.orderId,
+                handler: async function (response) {
+                  try {
+                    const verifyRes = await verifyTopUpPayment({
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_signature: response.razorpay_signature
+                    });
+                    if (verifyRes.success) {
+                      resolve(verifyRes);
+                    } else {
+                      reject(new Error(verifyRes.message || "Signature verification failed."));
+                    }
+                  } catch (err) {
+                    reject(err);
+                  }
+                },
+                prefill: { name: "Premium Customer", email: "customer@example.com", contact: number },
+                theme: { color: "#4f46e5" },
+                modal: { ondismiss: function () { reject(new Error("Payment cancelled by user.")); } }
+              };
+              const rzp = new window.Razorpay(options);
+              rzp.on("payment.failed", function (response) { reject(new Error(response.error.description || "Payment failed.")); });
+              rzp.open();
+            });
+          }
+
+          await paymentPromise;
+          finalWalletUsedAmount = baseFinalAmount;
+          finalUseWallet = true;
+        }
+
+        // Post Wallet Recharge
+        const result = await api.post('/recharges', {
+          operator: op?.name,
+          number: number,
+          amount: plan?.price,
+          plan: `${plan?.data} · ${plan?.validity}`,
+          planData: plan ? {
+            price: plan.price,
+            data: plan.data,
+            calls: plan.calls,
+            validity: plan.validity,
+            validityDays: plan.validityDays,
+            tag: plan.tag
+          } : undefined,
+          payMethod: 'Wallet',
+          couponCode: appliedCoupon?.code || undefined,
+          referralCode: appliedReferralCode || undefined,
+          useWallet: finalUseWallet,
+          walletAmountUsed: finalWalletUsedAmount
+        });
+
+        const { recharge } = result.data;
+        pendingRechargeId.current = recharge.id;
+        setLiveStatus(recharge.status || "RECHARGE_PROCESSING");
+        setLiveMessage(result.message || "Recharge processing with operator…");
+
+        await refetchWallet();
+
+        addRechargeRecord({
+          _id: recharge.id,
+          id: recharge.transactionId,
+          operator: recharge.operator,
+          number: recharge.number,
+          amount: recharge.amount,
+          plan: recharge.plan,
+          createdAt: recharge.date,
+          status: recharge.status,
+          providerResponse: recharge.providerResponse
+        });
+      } else {
+        // Direct External Recharge Payment (UPI, Card, Net Banking)
+        const initRes = await api.post('/recharges', {
+          operator: op?.name,
+          number: number,
+          amount: plan?.price,
+          plan: `${plan?.data} · ${plan?.validity}`,
+          planData: plan ? {
+            price: plan.price,
+            data: plan.data,
+            calls: plan.calls,
+            validity: plan.validity,
+            validityDays: plan.validityDays,
+            tag: plan.tag
+          } : undefined,
+          payMethod: payMethods.find(p => p.id === payMethod)?.label || 'UPI',
+          couponCode: appliedCoupon?.code || undefined,
+          referralCode: appliedReferralCode || undefined,
+          useWallet: false,
+          walletAmountUsed: 0
+        });
+
+        if (!initRes.success || !initRes.data || !initRes.data.isExternalPayment) {
+          throw new Error(initRes.message || "Failed to initiate external recharge payment.");
+        }
+
+        const { order, recharge: pendingRecharge } = initRes.data;
+
+        // Open Razorpay Checkout for direct payment
         const sdkLoaded = await loadRazorpay();
         if (!sdkLoaded) {
           setProcessing(false);
@@ -389,135 +527,74 @@ export default function Recharge() {
           return;
         }
 
-        // 1. Create top-up order on backend for the remaining difference
-        const orderRes = await createTopUpOrder(finalAmount);
-        if (!orderRes.success || !orderRes.data) {
-          throw new Error(orderRes.message || "Failed to create payment order.");
-        }
-
-        const order = orderRes.data;
-
-        // Check if we are using placeholder/mock credentials
         const isMockMode = 
           !import.meta.env.VITE_RAZORPAY_KEY || 
           import.meta.env.VITE_RAZORPAY_KEY.includes('YOUR_KEY_ID');
 
-        let paymentPromise;
+        let verifyRes;
         if (isMockMode && order.orderId.startsWith('order_mock_')) {
-          console.log("ℹ️ Placeholder keys detected. Running in mock Razorpay simulator mode.");
-          
-          paymentPromise = (async () => {
-            // Simulate bank payment delay
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-            
-            // Verify payment on backend
-            return await verifyTopUpPayment({
-              razorpay_order_id: order.orderId,
-              razorpay_payment_id: `pay_mock_${Date.now()}`,
-              razorpay_signature: "mock_signature_approved"
-            });
-          })();
+          console.log("ℹ️ Placeholder keys detected. Running in mock Razorpay simulator mode for direct recharge.");
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          verifyRes = await api.post('/payment/verify-recharge', {
+            razorpay_order_id: order.orderId,
+            razorpay_payment_id: `pay_mock_${Date.now()}`,
+            razorpay_signature: "mock_signature_approved"
+          });
         } else {
-          // 2. Open Razorpay Checkout for the difference
-          paymentPromise = new Promise((resolve, reject) => {
+          verifyRes = await new Promise((resolve, reject) => {
             const options = {
               key: import.meta.env.VITE_RAZORPAY_KEY || "rzp_test_dummyKeyId",
               amount: order.amount * 100,
-            currency: order.currency || "INR",
-            name: "VoltTap",
-            description: `Recharge Payment for +91 ${number}`,
-            order_id: order.orderId,
-            handler: async function (response) {
-              try {
-                // Verify signature on backend
-                const verifyRes = await verifyTopUpPayment({
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature
-                });
-
-                if (verifyRes.success) {
-                  resolve(verifyRes);
-                } else {
-                  reject(new Error(verifyRes.message || "Payment signature verification failed."));
+              currency: order.currency || "INR",
+              name: "VoltTap",
+              description: `Direct Recharge Payment (+91 ${number})`,
+              order_id: order.orderId,
+              handler: async function (response) {
+                try {
+                  const res = await api.post('/payment/verify-recharge', {
+                    razorpay_order_id: response.razorpay_order_id,
+                    razorpay_payment_id: response.razorpay_payment_id,
+                    razorpay_signature: response.razorpay_signature
+                  });
+                  resolve(res);
+                } catch (err) {
+                  reject(err);
                 }
-              } catch (err) {
-                reject(err);
-              }
-            },
-            prefill: {
-              name: "Premium Customer",
-              email: "customer@example.com",
-              contact: number
-            },
-            theme: {
-              color: "#4f46e5"
-            },
-            modal: {
-              ondismiss: function () {
-                reject(new Error("Payment cancelled by user."));
-              }
-            }
-          };
-
-          const rzp = new window.Razorpay(options);
-          rzp.on("payment.failed", function (response) {
-            reject(new Error(response.error.description || "Payment failed."));
+              },
+              prefill: { name: "Premium Customer", email: "customer@example.com", contact: number },
+              theme: { color: "#4f46e5" },
+              modal: { ondismiss: function () { reject(new Error("Payment cancelled by user.")); } }
+            };
+            const rzp = new window.Razorpay(options);
+            rzp.on("payment.failed", function (response) { reject(new Error(response.error.description || "Payment failed.")); });
+            rzp.open();
           });
-          rzp.open();
+        }
+
+        if (!verifyRes.success || !verifyRes.data) {
+          throw new Error(verifyRes.message || "Payment signature verification failed.");
+        }
+
+        const { recharge: finalRecharge } = verifyRes.data;
+
+        pendingRechargeId.current = finalRecharge._id || finalRecharge.id;
+        setLiveStatus(finalRecharge.status || "RECHARGE_PROCESSING");
+        setLiveMessage(verifyRes.message || "Recharge processing with operator…");
+
+        // Do NOT call refetchWallet() because direct payment doesn't modify user wallet balance!
+        
+        addRechargeRecord({
+          _id: finalRecharge._id || finalRecharge.id,
+          id: finalRecharge.transactionId,
+          operator: finalRecharge.operator,
+          number: finalRecharge.number,
+          amount: finalRecharge.amount,
+          plan: finalRecharge.plan,
+          createdAt: finalRecharge.createdAt || finalRecharge.date,
+          status: finalRecharge.status,
+          providerResponse: finalRecharge.providerResponse
         });
       }
-
-        // Wait for payment to complete and verify
-        await paymentPromise;
-
-        // Now that the top-up succeeded, the entire baseFinalAmount will be debited from the wallet
-        finalWalletUsedAmount = baseFinalAmount;
-        finalUseWallet = true;
-      }
-
-      // 3. Create recharge in the backend using the updated wallet balance
-      const result = await api.post('/recharges', {
-        operator: op?.name,
-        number: number,
-        amount: plan?.price,
-        plan: `${plan?.data} · ${plan?.validity}`,
-        planData: plan ? {
-          price: plan.price,
-          data: plan.data,
-          calls: plan.calls,
-          validity: plan.validity,
-          validityDays: plan.validityDays,
-          tag: plan.tag
-        } : undefined,
-        payMethod: payMethods.find(p => p.id === payMethod)?.label || 'UPI',
-        couponCode: appliedCoupon?.code || undefined,
-        referralCode: appliedReferralCode || undefined,
-        useWallet: finalUseWallet,
-        walletAmountUsed: finalWalletUsedAmount
-      });
-
-      const { recharge, walletUsed } = result.data;
-
-      pendingRechargeId.current = recharge.id;
-      setLiveStatus(recharge.status || "RECHARGE_PROCESSING");
-      setLiveMessage(result.message || "Recharge processing with operator…");
-
-      if (walletUsed > 0) {
-        await refetchWallet();
-      }
-
-      addRechargeRecord({
-        _id: recharge.id,
-        id: recharge.transactionId,
-        operator: recharge.operator,
-        number: recharge.number,
-        amount: recharge.amount,
-        plan: recharge.plan,
-        createdAt: recharge.date,
-        status: recharge.status,
-        providerResponse: recharge.providerResponse
-      });
 
       setLastRechargeData({
         mobile: number,
@@ -946,7 +1023,7 @@ export default function Recharge() {
               </div>
 
               {/* Wallet Usage Toggle */}
-              {globalWalletBalance > 0 && (
+              {payMethod === 'wallet' && globalWalletBalance > 0 && (
                 <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-5 py-4 mb-6 shadow-sm">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">👝</span>
