@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
+import { API_BASE } from "../../utils/api";
 
 const EyeIcon = ({ open }) =>
   open ? (
@@ -50,7 +51,7 @@ export default function SignUp() {
     setApiError("");
     
     try {
-      const res = await fetch("http://localhost:5000/api/v1/auth/register", {
+      const res = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

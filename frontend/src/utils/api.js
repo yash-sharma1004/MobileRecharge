@@ -1,6 +1,18 @@
-// const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const getApiBase = () => {
+  // In development mode (npm run dev), always point to the local backend
+  if (import.meta.env.DEV) {
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      // Support testing from other devices on the same local network (e.g. mobile)
+      return `http://${window.location.hostname}:5000/api/v1`;
+    }
+    return 'http://localhost:5000/api/v1';
+  }
 
-const API_BASE = `http://localhost:5000/api/v1`
+  // In production mode (Vercel deployment)
+  return import.meta.env.VITE_API_BASE_URL || 'https://volttap.onrender.com/api/v1';
+};
+
+export const API_BASE = getApiBase();
 
 /**
  * Makes an authenticated API request.

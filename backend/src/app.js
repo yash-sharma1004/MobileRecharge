@@ -25,6 +25,10 @@ app.get('/', (req, res) => {
   res.json({ message: 'VoltTap API is running' });
 });
 
+app.get('/api/v1', (req, res) => {
+  res.json({ success: true, message: 'VoltTap API v1 is active and running' });
+});
+
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);

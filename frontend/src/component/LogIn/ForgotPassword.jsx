@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE } from "../../utils/api";
 
 
 export default function ForgotPassword() {
@@ -40,7 +41,7 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/send", {
+      const res = await fetch(`${API_BASE}/auth/forgot-password/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier })
@@ -65,7 +66,7 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/verify", {
+      const res = await fetch(`${API_BASE}/auth/forgot-password/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, otp: otpCode })
@@ -92,7 +93,7 @@ export default function ForgotPassword() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/v1/auth/forgot-password/reset", {
+      const res = await fetch(`${API_BASE}/auth/forgot-password/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resetToken, newPassword })

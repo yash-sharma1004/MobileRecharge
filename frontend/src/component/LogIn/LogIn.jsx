@@ -7,6 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
+import { API_BASE } from "../../utils/api";
 
 // ── Icons ──
 const EyeOn = () => (
@@ -192,7 +193,7 @@ export default function Login() {
 
     try {
       // --- Legacy Backend Email OTP Flow ---
-      const res = await fetch("http://localhost:5000/api/v1/auth/login-otp/send", {
+      const res = await fetch(`${API_BASE}/auth/login-otp/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier })
@@ -220,7 +221,7 @@ export default function Login() {
     setApiError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/v1/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -263,7 +264,7 @@ export default function Login() {
 
     try {
       // --- Legacy Backend Email OTP Flow ---
-      const res = await fetch("http://localhost:5000/api/v1/auth/login-otp/verify", {
+      const res = await fetch(`${API_BASE}/auth/login-otp/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, otp: otpValue })
